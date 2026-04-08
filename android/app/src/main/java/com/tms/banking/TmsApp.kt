@@ -34,7 +34,7 @@ class AppContainer(private val context: Context) {
         }
     }
 
-    fun buildApi(baseUrl: String): TmsApi = TmsApi.create(baseUrl)
+    fun buildApi(baseUrl: String): TmsApi = TmsApi.create(TmsApi.sanitizeUrl(baseUrl))
 
     fun accountRepository(api: TmsApi) = AccountRepository(db.accountDao(), api)
     fun transactionRepository(api: TmsApi) = TransactionRepository(db.transactionDao(), api)

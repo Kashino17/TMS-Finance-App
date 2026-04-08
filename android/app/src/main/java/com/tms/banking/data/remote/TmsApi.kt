@@ -53,8 +53,19 @@ interface TmsApi {
     suspend fun postNotification(@Body notification: NotificationDto): Response<Map<String, String>>
 
     companion object {
+        fun sanitizeUrl(input: String): String {
+            var url = input.trim()
+            if (url.isBlank()) return ""
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                url = "http://$url"
+            }
+            if (!url.endsWith("/")) url = "$url/"
+            return url
+        }
+
         fun create(baseUrl: String): TmsApi {
-            val url = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+            val url = sanitizeUrl(baseUrl)
+            if (url.isBlank()) throw IllegalArgumentException("Empty URL")
             val logging = HttpLoggingInterceptor().apply {
                 level = HttpLoggingInterceptor.Level.BODY
             }

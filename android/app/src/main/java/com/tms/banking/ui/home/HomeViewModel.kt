@@ -58,13 +58,17 @@ class HomeViewModel(
     }
 
     private fun initRepositories(url: String) {
-        val api = container.buildApi(url)
-        accountRepo = container.accountRepository(api)
-        transactionRepo = container.transactionRepository(api)
-        categoryRepo = container.categoryRepository(api)
-        _uiState.value = _uiState.value.copy(backendConfigured = true)
-        observeData()
-        refresh()
+        try {
+            val api = container.buildApi(url)
+            accountRepo = container.accountRepository(api)
+            transactionRepo = container.transactionRepository(api)
+            categoryRepo = container.categoryRepository(api)
+            _uiState.value = _uiState.value.copy(backendConfigured = true)
+            observeData()
+            refresh()
+        } catch (e: Exception) {
+            _uiState.value = _uiState.value.copy(backendConfigured = false, error = "Invalid backend URL")
+        }
     }
 
     private fun observeData() {
