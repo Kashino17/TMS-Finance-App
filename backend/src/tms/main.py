@@ -34,8 +34,13 @@ def _get_connector(bank: str):
     from tms.connectors.fints_connector import FinTSConnector
 
     if bank in ("emirates_nbd", "mashreq", "fab", "vio"):
-        if settings.lean_app_token:
-            return LeanConnector(settings.lean_app_token, settings.lean_customer_id)
+        if settings.lean_app_id and settings.lean_client_secret:
+            return LeanConnector(
+                app_id=settings.lean_app_id,
+                client_secret=settings.lean_client_secret,
+                customer_id=settings.lean_customer_id,
+                sandbox=settings.lean_sandbox,
+            )
     elif bank == "revolut":
         if settings.revolut_refresh_token:
             return RevolutConnector(settings.revolut_refresh_token)

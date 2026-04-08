@@ -1,6 +1,7 @@
 package com.tms.banking.ui.home
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,8 +13,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CurrencyExchange
@@ -22,6 +25,8 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.DateRangePicker
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconToggleButton
 import androidx.compose.material3.FilterChip
@@ -29,11 +34,16 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +51,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import com.tms.banking.TmsApp
 import com.tms.banking.ui.components.AccountCard
 import com.tms.banking.ui.components.FoldAwareLayout
@@ -64,6 +78,46 @@ fun HomeScreen(
     val vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory(app.container))
     val state by vm.uiState.collectAsStateWithLifecycle()
     val foldState = rememberFoldState()
+
+    var dateFilter by remember { mutableStateOf(DateFilter.ALL) }
+    var customFrom by remember { mutableStateOf<LocalDate?>(null) }
+    var customTo by remember { mutableStateOf<LocalDate?>(null) }
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    val filteredTransactions = remember(state.transactions, dateFilter, customFrom, customTo) {
+        val now = LocalDate.now()
+        val (from, to) = when (dateFilter) {
+            DateFilter.THIS_MONTH -> now.withDayOfMonth(1) to now
+            DateFilter.LAST_MONTH -> now.minusMonths(1).withDayOfMonth(1) to now.minusMonths(1).withDayOfMonth(now.minusMonths(1).lengthOfMonth())
+            DateFilter.THREE_MONTHS -> now.minusMonths(3) to now
+            DateFilter.SIX_MONTHS -> now.minusMonths(6) to now
+            DateFilter.THIS_YEAR -> now.withDayOfYear(1) to now
+            DateFilter.CUSTOM -> (customFrom ?: now.minusYears(10)) to (customTo ?: now)
+            DateFilter.ALL -> null to null
+        }
+        if (from == null || to == null) {
+            state.transactions
+        } else {
+            state.transactions.filter { tx ->
+                try {
+                    val txDate = LocalDate.parse(tx.date)
+                    !txDate.isBefore(from) && !txDate.isAfter(to)
+                } catch (e: Exception) { true }
+            }
+        }
+    }
+
+    if (showDatePicker) {
+        DateRangePickerDialog(
+            onDismiss = { showDatePicker = false },
+            onConfirm = { fromMillis, toMillis ->
+                customFrom = fromMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
+                customTo = toMillis?.let { Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate() }
+                dateFilter = DateFilter.CUSTOM
+                showDatePicker = false
+            }
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -152,22 +206,28 @@ fun HomeScreen(
 
                         item {
                             Spacer(modifier = Modifier.height(8.dp))
-                            SectionHeader("Recent Transactions")
+                            SectionHeader("Transactions (${filteredTransactions.size})")
+                            Spacer(modifier = Modifier.height(8.dp))
+                            DateFilterRow(
+                                selectedFilter = dateFilter,
+                                onFilterChange = { dateFilter = it },
+                                onCustomRange = { showDatePicker = true }
+                            )
                             Spacer(modifier = Modifier.height(8.dp))
                         }
 
-                        if (state.transactions.isEmpty() && !state.isLoading) {
+                        if (filteredTransactions.isEmpty() && !state.isLoading) {
                             item {
                                 Box(
                                     modifier = Modifier.fillMaxWidth().padding(32.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
-                                    Text("No transactions", color = OnSurface)
+                                    Text("No transactions in this period", color = OnSurface)
                                 }
                             }
                         }
 
-                        items(state.transactions) { tx ->
+                        items(filteredTransactions) { tx ->
                             val category = state.categories.find { it.id == tx.categoryId }
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -293,6 +353,71 @@ private fun ErrorBanner(error: String) {
                 modifier = Modifier.padding(start = 8.dp)
             )
         }
+    }
+}
+
+enum class DateFilter(val label: String) {
+    ALL("All"),
+    THIS_MONTH("This Month"),
+    LAST_MONTH("Last Month"),
+    THREE_MONTHS("3 Months"),
+    SIX_MONTHS("6 Months"),
+    THIS_YEAR("This Year"),
+    CUSTOM("Custom")
+}
+
+@Composable
+private fun DateFilterRow(
+    selectedFilter: DateFilter,
+    onFilterChange: (DateFilter) -> Unit,
+    onCustomRange: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        DateFilter.entries.forEach { filter ->
+            FilterChip(
+                selected = selectedFilter == filter,
+                onClick = {
+                    if (filter == DateFilter.CUSTOM) onCustomRange()
+                    else onFilterChange(filter)
+                },
+                label = { Text(filter.label, fontSize = 11.sp) },
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = Primary.copy(alpha = 0.2f),
+                    selectedLabelColor = Primary,
+                    containerColor = Surface,
+                    labelColor = OnSurface
+                )
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DateRangePickerDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (Long?, Long?) -> Unit
+) {
+    val state = rememberDateRangePickerState()
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(onClick = { onConfirm(state.selectedStartDateMillis, state.selectedEndDateMillis) }) {
+                Text("OK", color = Primary)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = OnSurface)
+            }
+        }
+    ) {
+        DateRangePicker(state = state, modifier = Modifier.height(500.dp))
     }
 }
 

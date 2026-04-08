@@ -1,0 +1,97 @@
+<h2>Systemarchitektur — TMS Banking (v2)</h2>
+<p class="subtitle">MacBook-Backend mit Catch-Up Sync + Native Android App über Tailscale</p>
+
+<div class="mockup">
+  <div class="mockup-header">Architektur-Übersicht</div>
+  <div class="mockup-body" style="padding: 24px; font-family: monospace; font-size: 14px; line-height: 1.8;">
+
+    <!-- Banks Row -->
+    <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+      <div style="background: #1e3a5f; color: #7eb8ff; padding: 8px 14px; border-radius: 8px; font-size: 12px;">🏦 Emirates NBD</div>
+      <div style="background: #1e3a5f; color: #7eb8ff; padding: 8px 14px; border-radius: 8px; font-size: 12px;">🏦 Mashreq</div>
+      <div style="background: #1e3a5f; color: #7eb8ff; padding: 8px 14px; border-radius: 8px; font-size: 12px;">🏦 FAB</div>
+      <div style="background: #1e3a5f; color: #7eb8ff; padding: 8px 14px; border-radius: 8px; font-size: 12px;">🏦 VIO</div>
+      <div style="background: #2d1e5f; color: #b07eff; padding: 8px 14px; border-radius: 8px; font-size: 12px;">💳 Revolut</div>
+      <div style="background: #5f1e1e; color: #ff7e7e; padding: 8px 14px; border-radius: 8px; font-size: 12px;">🏛 Sparkasse</div>
+      <div style="background: #1e5f3a; color: #7effb0; padding: 8px 14px; border-radius: 8px; font-size: 12px;">🏦 Statris</div>
+    </div>
+
+    <!-- Arrow down -->
+    <div style="text-align: center; color: #666; font-size: 20px; margin: 8px 0;">▼ APIs & Protokolle ▼</div>
+
+    <!-- Integration Layer -->
+    <div style="display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px;">
+      <div style="background: #3a2e1e; color: #ffc87e; padding: 8px 14px; border-radius: 8px; font-size: 12px;">Lean Technologies (UAE)</div>
+      <div style="background: #3a2e1e; color: #ffc87e; padding: 8px 14px; border-radius: 8px; font-size: 12px;">Revolut API</div>
+      <div style="background: #3a2e1e; color: #ffc87e; padding: 8px 14px; border-radius: 8px; font-size: 12px;">FinTS/HBCI</div>
+    </div>
+
+    <!-- Arrow down -->
+    <div style="text-align: center; color: #666; font-size: 20px; margin: 8px 0;">▼</div>
+
+    <!-- Backend Server -->
+    <div style="background: #1a2a1a; border: 2px solid #4caf50; border-radius: 12px; padding: 20px; margin: 0 auto 16px; max-width: 540px;">
+      <div style="text-align: center; color: #4caf50; font-weight: bold; font-size: 16px; margin-bottom: 4px;">💻 MacBook — Self-Hosted Backend</div>
+      <div style="color: #aaa; font-size: 12px; text-align: center; margin-bottom: 14px;">Nicht immer an — Sync-Strategie kompensiert Ausfallzeiten</div>
+      <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+        <div style="background: #2a3a2a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #8bc34a;">Bank Sync Engine</div>
+        <div style="background: #2a3a2a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #8bc34a;">Auto-Kategorisierung</div>
+        <div style="background: #2a3a2a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #8bc34a;">Währungsrechner</div>
+        <div style="background: #2a3a2a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #8bc34a;">REST API</div>
+        <div style="background: #2a3a2a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #8bc34a;">SQLite DB</div>
+      </div>
+
+      <!-- Sync Strategy Box -->
+      <div style="background: #1a2a1a; border: 1px solid #ff9800; border-radius: 8px; padding: 14px; margin-top: 8px;">
+        <div style="color: #ff9800; font-weight: bold; font-size: 13px; margin-bottom: 8px;">🔄 Sync-Strategie</div>
+        <div style="color: #ccc; font-size: 12px; line-height: 1.8;">
+          <div style="margin-bottom: 6px;">
+            <span style="color: #ff9800; font-weight: bold;">Startup Catch-Up:</span><br>
+            Beim Hochfahren → prüft "last_sync_timestamp" pro Konto<br>
+            → holt alle Transaktionen seit letztem Sync nach
+          </div>
+          <div style="margin-bottom: 6px;">
+            <span style="color: #ff9800; font-weight: bold;">Initial Full Sync:</span><br>
+            Bei Erstverbindung einer Bank → komplette Historie importieren<br>
+            (so weit zurück wie die API hergibt)
+          </div>
+          <div>
+            <span style="color: #ff9800; font-weight: bold;">Laufender Sync:</span><br>
+            Solange MacBook an → alle 15 Min. neue Transaktionen abrufen
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tailscale connection -->
+    <div style="text-align: center; margin: 8px 0;">
+      <div style="display: inline-block; background: #1e2a3a; border: 1px solid #4a7fff; border-radius: 20px; padding: 6px 20px; color: #4a7fff; font-size: 13px;">🔒 Tailscale VPN (verschlüsselt)</div>
+    </div>
+
+    <!-- Arrow down -->
+    <div style="text-align: center; color: #666; font-size: 20px; margin: 8px 0;">▼</div>
+
+    <!-- Phone -->
+    <div style="background: #1a1a2a; border: 2px solid #7c4dff; border-radius: 12px; padding: 20px; margin: 0 auto; max-width: 540px;">
+      <div style="text-align: center; color: #7c4dff; font-weight: bold; font-size: 16px; margin-bottom: 4px;">📱 Galaxy Fold 7 — Native Android App (Kotlin)</div>
+      <div style="color: #aaa; font-size: 12px; text-align: center; margin-bottom: 14px;">Funktioniert auch offline dank lokalem Cache</div>
+      <div style="display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px;">
+        <div style="background: #2a2a3a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #b39ddb;">Dashboard UI</div>
+        <div style="background: #2a2a3a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #b39ddb;">Lokaler SQLite Cache</div>
+        <div style="background: #2a2a3a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #b39ddb;">Notification Listener</div>
+        <div style="background: #2a2a3a; padding: 6px 12px; border-radius: 6px; font-size: 11px; color: #b39ddb;">Fold-Optimierung</div>
+      </div>
+
+      <!-- App Sync Box -->
+      <div style="background: #1a1a2a; border: 1px solid #7c4dff; border-radius: 8px; padding: 14px; margin-top: 8px;">
+        <div style="color: #7c4dff; font-weight: bold; font-size: 13px; margin-bottom: 8px;">📲 App-Verhalten</div>
+        <div style="color: #ccc; font-size: 12px; line-height: 1.8;">
+          <span style="color: #7c4dff;">Backend online:</span> Echtzeit-Daten vom Server<br>
+          <span style="color: #7c4dff;">Backend offline:</span> Zeigt gecachte Daten + fängt Notifications lokal auf<br>
+          <span style="color: #7c4dff;">Backend kommt zurück:</span> Lokal gefangene Notifications → ans Backend senden
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
