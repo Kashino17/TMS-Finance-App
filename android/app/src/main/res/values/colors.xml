@@ -12,4 +12,5 @@
     <color name="on_primary">#FFFFFF</color>
     <color name="on_background">#E0E0E0</color>
     <color name="on_surface">#BDBDBD</color>
+    <color name="ic_launcher_background">#1a1a2e</color>
 </resources>

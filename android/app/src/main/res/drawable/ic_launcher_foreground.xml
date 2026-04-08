@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Bank icon: simple building shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28L30,42L30,44L78,44L78,42ZM36,48L36,68L42,68L42,48ZM50,48L50,68L58,68L58,48ZM66,48L66,68L72,68L72,48ZM28,72L28,76L80,76L80,72Z"/>
+</vector>
