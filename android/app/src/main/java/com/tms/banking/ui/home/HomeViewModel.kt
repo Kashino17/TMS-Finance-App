@@ -75,7 +75,7 @@ class HomeViewModel(
         viewModelScope.launch {
             combine(
                 accountRepo!!.observeAccounts(),
-                transactionRepo!!.observeTransactions(limit = 50),
+                transactionRepo!!.observeTransactions(limit = 5000),
                 categoryRepo!!.observeCategories()
             ) { accounts, transactions, categories ->
                 Triple(accounts, transactions, categories)
@@ -99,7 +99,7 @@ class HomeViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, error = null)
             val r1 = accRepo.refreshAccounts()
-            val r2 = txRepo.refreshTransactions(limit = 50)
+            val r2 = txRepo.refreshTransactions(limit = 5000)
             val r3 = catRepo.refreshCategories()
             val err = listOf(r1, r2, r3).firstOrNull { it.isFailure }?.exceptionOrNull()?.message
             _uiState.value = _uiState.value.copy(isLoading = false, error = err)

@@ -10,7 +10,7 @@ class TransactionRepository(
     private val transactionDao: TransactionDao,
     private val api: TmsApi
 ) {
-    fun observeTransactions(limit: Int = 50, offset: Int = 0): Flow<List<TransactionEntity>> =
+    fun observeTransactions(limit: Int = 5000, offset: Int = 0): Flow<List<TransactionEntity>> =
         transactionDao.observeTransactions(limit, offset)
 
     fun observeTransactionsByAccount(accountId: Int, limit: Int = 50, offset: Int = 0): Flow<List<TransactionEntity>> =
@@ -19,7 +19,7 @@ class TransactionRepository(
     fun observeTransactionsByCategory(categoryId: Int): Flow<List<TransactionEntity>> =
         transactionDao.observeTransactionsByCategory(categoryId)
 
-    suspend fun refreshTransactions(accountId: Int? = null, limit: Int = 50, offset: Int = 0): Result<Unit> {
+    suspend fun refreshTransactions(accountId: Int? = null, limit: Int = 5000, offset: Int = 0): Result<Unit> {
         return try {
             val transactions = api.getTransactions(accountId, limit, offset)
             if (accountId != null) {
