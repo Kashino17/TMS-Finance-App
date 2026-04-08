@@ -80,7 +80,7 @@ fun DonutChart(
                 val gap = 2f
 
                 slices.forEach { slice ->
-                    val sweep = ((slice.value / total) * 360f * animatedProgress - gap).coerceAtLeast(0f)
+                    val sweep = ((slice.value.toFloat() / total.toFloat()) * 360f * animatedProgress - gap).coerceAtLeast(0f)
                     drawArc(
                         color = slice.color,
                         startAngle = startAngle,
