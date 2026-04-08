@@ -31,3 +31,7 @@ env/
 
 # Pytest
 .pytest_cache/
+android/.gradle/
+android/.kotlin/
+.superpowers/
+.serena/
