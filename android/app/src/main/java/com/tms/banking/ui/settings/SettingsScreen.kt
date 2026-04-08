@@ -47,6 +47,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.material.icons.filled.AccountBalance
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -166,6 +174,101 @@ fun SettingsScreen(app: TmsApp) {
                             }
                         }
                         else -> {}
+                    }
+                }
+            }
+
+            item {
+                SectionCard(title = "🏦 Emirates NBD") {
+                    var showPassword by remember { mutableStateOf(false) }
+
+                    OutlinedTextField(
+                        value = state.enbdUsername,
+                        onValueChange = { vm.setEnbdUsername(it) },
+                        label = { Text("Username / Email", color = OnSurface) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        leadingIcon = { Icon(Icons.Filled.AccountBalance, null, tint = OnSurface) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnBackground,
+                            unfocusedTextColor = OnBackground,
+                            focusedBorderColor = Primary,
+                            unfocusedBorderColor = Outline,
+                            focusedLabelColor = Primary,
+                            unfocusedLabelColor = OnSurface,
+                            cursorColor = Primary,
+                            focusedContainerColor = SurfaceVariant,
+                            unfocusedContainerColor = SurfaceVariant
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = state.enbdPassword,
+                        onValueChange = { vm.setEnbdPassword(it) },
+                        label = { Text("Password", color = OnSurface) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showPassword = !showPassword }) {
+                                Icon(
+                                    if (showPassword) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = "Toggle password",
+                                    tint = OnSurface
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnBackground,
+                            unfocusedTextColor = OnBackground,
+                            focusedBorderColor = Primary,
+                            unfocusedBorderColor = Outline,
+                            focusedLabelColor = Primary,
+                            unfocusedLabelColor = OnSurface,
+                            cursorColor = Primary,
+                            focusedContainerColor = SurfaceVariant,
+                            unfocusedContainerColor = SurfaceVariant
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = { vm.saveEnbdCredentials() },
+                            modifier = Modifier.weight(1f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Outline)
+                        ) {
+                            Text("Save", color = OnBackground)
+                        }
+                        Button(
+                            onClick = { vm.syncEnbd() },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                            enabled = state.enbdSyncStatus != "waiting_smartpass" && state.enbdSyncStatus != "syncing"
+                        ) {
+                            if (state.enbdSyncStatus == "waiting_smartpass" || state.enbdSyncStatus == "syncing") {
+                                CircularProgressIndicator(
+                                    color = OnBackground,
+                                    modifier = Modifier.height(18.dp).width(18.dp),
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Text("Sync ENBD", color = OnBackground)
+                            }
+                        }
+                    }
+                    if (state.enbdSyncMessage.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val msgColor = when (state.enbdSyncStatus) {
+                            "done" -> Positive
+                            "error" -> Negative
+                            "waiting_smartpass" -> Color(0xFFFF9800)
+                            else -> OnSurface
+                        }
+                        Text(state.enbdSyncMessage, color = msgColor, fontSize = 13.sp)
+                    }
+                    if (state.enbdHasCredentials) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text("🔒 Credentials encrypted & stored locally", color = OnSurface.copy(alpha = 0.6f), fontSize = 11.sp)
                     }
                 }
             }

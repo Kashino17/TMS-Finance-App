@@ -49,6 +49,12 @@ interface TmsApi {
     @POST("api/sync/trigger")
     suspend fun triggerSync(): Response<Map<String, String>>
 
+    @POST("api/sync/enbd")
+    suspend fun syncEnbd(@Body credentials: Map<String, String>): Response<Map<String, String>>
+
+    @GET("api/sync/enbd/status")
+    suspend fun getEnbdSyncStatus(): Response<Map<String, String>>
+
     @POST("api/notifications")
     suspend fun postNotification(@Body notification: NotificationDto): Response<Map<String, String>>
 

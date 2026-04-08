@@ -10,8 +10,11 @@ class Settings(BaseSettings):
     sync_interval_minutes: int = 15
 
     # Lean Technologies
+    lean_app_id: str = ""
+    lean_client_secret: str = ""
     lean_app_token: str = ""
     lean_customer_id: str = ""
+    lean_sandbox: bool = True
 
     # Revolut
     revolut_client_id: str = ""
@@ -23,6 +26,10 @@ class Settings(BaseSettings):
     fints_login: str = ""
     fints_pin: str = ""
     fints_endpoint: str = ""
+
+    # Emirates NBD Web Banking
+    enbd_username: str = ""
+    enbd_password: str = ""
 
     # Exchange rate API
     exchange_rate_api_url: str = "https://api.exchangerate.host/latest"

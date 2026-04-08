@@ -58,3 +58,8 @@ class NotificationIn(BaseModel):
     title: str
     text: str
     timestamp: datetime
+
+
+class ENBDSyncRequest(BaseModel):
+    username: str
+    password: str

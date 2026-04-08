@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.tms.banking.data.local.SecureCredentialStore
 import com.tms.banking.data.local.TmsDatabase
 import com.tms.banking.data.remote.TmsApi
 import com.tms.banking.data.repository.AccountRepository
@@ -23,6 +24,7 @@ object PrefsKeys {
 
 class AppContainer(private val context: Context) {
     private val db = TmsDatabase.getInstance(context)
+    val credentialStore = SecureCredentialStore(context)
 
     val backendUrlFlow: Flow<String> = context.dataStore.data.map { prefs ->
         prefs[PrefsKeys.BACKEND_URL] ?: ""
