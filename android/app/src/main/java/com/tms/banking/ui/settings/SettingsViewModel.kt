@@ -26,6 +26,12 @@ data class SettingsUiState(
     val enbdHasCredentials: Boolean = false,
     val enbdSyncStatus: String = "idle",
     val enbdSyncMessage: String = "",
+    // Kimi AI
+    val kimiApiKey: String = "",
+    val kimiKeyStatus: String = "idle",  // idle | testing | success | error
+    val kimiKeyMessage: String = "",
+    val kimiCategorizing: Boolean = false,
+    val kimiCategorizeMessage: String = "",
 )
 
 enum class ConnectionStatus {
@@ -46,10 +52,11 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
                 )
             }
         }
-        // Load saved ENBD credentials status
+        // Load saved credentials status
         _uiState.value = _uiState.value.copy(
             enbdHasCredentials = container.credentialStore.hasEnbdCredentials(),
             enbdUsername = container.credentialStore.enbdUsername,
+            kimiApiKey = container.credentialStore.kimiApiKey,
         )
     }
 
@@ -211,6 +218,69 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
                 val statuses = api.getSyncStatus()
                 _uiState.value = _uiState.value.copy(syncStatus = statuses)
             } catch (_: Exception) {}
+        }
+    }
+
+    // Kimi AI
+    fun setKimiApiKey(value: String) {
+        _uiState.value = _uiState.value.copy(kimiApiKey = value)
+    }
+
+    fun saveKimiApiKey() {
+        container.credentialStore.kimiApiKey = _uiState.value.kimiApiKey
+        _uiState.value = _uiState.value.copy(kimiKeyMessage = "API key saved (encrypted)")
+    }
+
+    fun testKimiKey() {
+        val url = _uiState.value.backendUrl
+        val key = _uiState.value.kimiApiKey
+        if (url.isBlank() || key.isBlank()) {
+            _uiState.value = _uiState.value.copy(kimiKeyStatus = "error", kimiKeyMessage = "Enter backend URL and API key first")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(kimiKeyStatus = "testing", kimiKeyMessage = "Testing...")
+            try {
+                val api = container.buildApi(url)
+                val resp = api.testKimiKey(mapOf("api_key" to key))
+                if (resp.isSuccessful) {
+                    val body = resp.body() ?: emptyMap()
+                    val status = body["status"] ?: "error"
+                    val message = body["message"] ?: "Unknown"
+                    _uiState.value = _uiState.value.copy(kimiKeyStatus = status, kimiKeyMessage = message)
+                } else {
+                    _uiState.value = _uiState.value.copy(kimiKeyStatus = "error", kimiKeyMessage = "Backend error: ${resp.code()}")
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(kimiKeyStatus = "error", kimiKeyMessage = "Error: ${e.message}")
+            }
+        }
+    }
+
+    fun aiCategorize() {
+        val url = _uiState.value.backendUrl
+        val key = container.credentialStore.kimiApiKey
+        if (url.isBlank() || key.isBlank()) {
+            _uiState.value = _uiState.value.copy(kimiCategorizeMessage = "Configure backend and API key first")
+            return
+        }
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(kimiCategorizing = true, kimiCategorizeMessage = "Categorizing with AI...")
+            try {
+                val api = container.buildApi(url)
+                val resp = api.aiCategorize(mapOf("api_key" to key, "batch_size" to 30))
+                if (resp.isSuccessful) {
+                    val body = resp.body() ?: emptyMap()
+                    _uiState.value = _uiState.value.copy(
+                        kimiCategorizing = false,
+                        kimiCategorizeMessage = body["message"]?.toString() ?: "Done"
+                    )
+                } else {
+                    _uiState.value = _uiState.value.copy(kimiCategorizing = false, kimiCategorizeMessage = "Error: ${resp.code()}")
+                }
+            } catch (e: Exception) {
+                _uiState.value = _uiState.value.copy(kimiCategorizing = false, kimiCategorizeMessage = "Error: ${e.message}")
+            }
         }
     }
 

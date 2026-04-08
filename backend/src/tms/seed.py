@@ -13,6 +13,11 @@ DEFAULT_CATEGORIES = [
     ("Unterhaltung", "🎬", "#9c27b0"),
     ("Abos", "📱", "#607d8b"),
     ("Transfers", "🔄", "#78909c"),
+    ("Bankgebühren", "🏦", "#455a64"),
+    ("Auto", "🚙", "#1565c0"),
+    ("Reisen", "✈️", "#00897b"),
+    ("Bildung", "📚", "#6a1b9a"),
+    ("Spenden", "🤝", "#c62828"),
     ("Sonstiges", "📦", "#9e9e9e"),
 ]
 

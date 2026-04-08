@@ -274,6 +274,91 @@ fun SettingsScreen(app: TmsApp) {
             }
 
             item {
+                SectionCard(title = "🤖 AI Categorization (Kimi K 2.5)") {
+                    var showKey by remember { mutableStateOf(false) }
+
+                    OutlinedTextField(
+                        value = state.kimiApiKey,
+                        onValueChange = { vm.setKimiApiKey(it) },
+                        label = { Text("Kimi API Key", color = OnSurface) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        visualTransformation = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                        trailingIcon = {
+                            IconButton(onClick = { showKey = !showKey }) {
+                                Icon(
+                                    if (showKey) Icons.Filled.VisibilityOff else Icons.Filled.Visibility,
+                                    contentDescription = "Toggle",
+                                    tint = OnSurface
+                                )
+                            }
+                        },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = OnBackground,
+                            unfocusedTextColor = OnBackground,
+                            focusedBorderColor = Primary,
+                            unfocusedBorderColor = Outline,
+                            cursorColor = Primary,
+                            focusedContainerColor = SurfaceVariant,
+                            unfocusedContainerColor = SurfaceVariant
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { vm.saveKimiApiKey() },
+                            modifier = Modifier.weight(1f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Outline)
+                        ) {
+                            Text("Save", color = OnBackground)
+                        }
+                        Button(
+                            onClick = { vm.testKimiKey() },
+                            modifier = Modifier.weight(1f),
+                            colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                            enabled = state.kimiKeyStatus != "testing"
+                        ) {
+                            if (state.kimiKeyStatus == "testing") {
+                                CircularProgressIndicator(color = OnBackground, modifier = Modifier.height(18.dp).width(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Text("Test Key", color = OnBackground)
+                            }
+                        }
+                    }
+                    if (state.kimiKeyMessage.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val color = when (state.kimiKeyStatus) {
+                            "success" -> Positive
+                            "error" -> Negative
+                            else -> OnSurface
+                        }
+                        Text(state.kimiKeyMessage, color = color, fontSize = 12.sp)
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = { vm.aiCategorize() },
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary),
+                        enabled = !state.kimiCategorizing && state.kimiApiKey.isNotBlank(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        if (state.kimiCategorizing) {
+                            CircularProgressIndicator(color = OnBackground, modifier = Modifier.height(20.dp).width(20.dp), strokeWidth = 2.dp)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Categorizing...", color = OnBackground)
+                        } else {
+                            Text("Categorize All Transactions", color = OnBackground, fontWeight = FontWeight.Medium)
+                        }
+                    }
+                    if (state.kimiCategorizeMessage.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(state.kimiCategorizeMessage, color = OnSurface, fontSize = 12.sp)
+                    }
+                    Text("🔒 API key encrypted & stored locally", color = OnSurface.copy(alpha = 0.6f), fontSize = 11.sp)
+                }
+            }
+
+            item {
                 SectionCard(title = "Sync") {
                     Button(
                         onClick = { vm.triggerSync() },

@@ -250,76 +250,113 @@ class ENBDScraper:
         return transactions
 
     def _scroll_to_load_all(self, page: Page) -> str:
-        """Scroll down repeatedly until all transactions are loaded.
-        ENBD uses infinite scroll in a specific container (not window scroll).
-        We use mouse wheel + scrollIntoView to trigger the loading."""
-        max_scrolls = 2000
-        prev_text_len = 0
+        """Scroll the transaction list to load ALL transactions via infinite scroll.
+
+        Key insight: ENBD's infinite scroll triggers when you scroll inside a specific
+        container, not the window. We simulate real mouse wheel scrolling in the center
+        of the page, exactly like a user would do manually.
+        """
+        max_scrolls = 3000
+        prev_line_count = 0
+        stall_count = 0
+
+        # Move mouse to center of page (where the transaction list is)
+        page.mouse.move(640, 400)
+        page.wait_for_timeout(1000)
 
         for i in range(max_scrolls):
-            # Method 1: Scroll the last visible element into view
-            page.evaluate("""
-                // Find all scrollable containers and scroll them
-                const containers = document.querySelectorAll('*');
-                for (const el of containers) {
-                    if (el.scrollHeight > el.clientHeight + 10 && el.clientHeight > 200) {
-                        el.scrollTop = el.scrollHeight;
-                    }
-                }
-                // Also scroll window
-                window.scrollTo(0, document.body.scrollHeight);
-                // Also scroll the last element into view
-                const allText = document.querySelectorAll('td, tr, div, li, span');
-                if (allText.length > 0) {
-                    allText[allText.length - 1].scrollIntoView({behavior: 'smooth'});
-                }
-            """)
+            # Simulate real mouse wheel scroll — small increments like a human
+            for _ in range(5):
+                page.mouse.wheel(0, 600)
+                page.wait_for_timeout(200)
 
-            # Method 2: Mouse wheel at the bottom of the page
-            page.mouse.wheel(0, 3000)
+            # Wait for ENBD to load the next batch
+            page.wait_for_timeout(3000)
 
-            # Wait for new content to load
-            page.wait_for_timeout(4000)
-
-            # Check if "No more transactions to load" appeared
-            try:
-                if page.locator('text=/no more transactions/i').is_visible(timeout=500):
-                    break
-            except:
-                pass
-
-            # Check if content actually grew
+            # Count lines to see if new content loaded
             current_text = page.inner_text("body")
-            current_len = len(current_text)
+            current_lines = current_text.count('\n')
 
-            if current_len == prev_text_len:
-                # No new content — try much harder with multiple attempts
-                for retry in range(5):
-                    page.mouse.wheel(0, 8000)
-                    page.keyboard.press("End")
-                    page.evaluate("""
-                        const containers = document.querySelectorAll('*');
-                        for (const el of containers) {
-                            if (el.scrollHeight > el.clientHeight + 10 && el.clientHeight > 200) {
-                                el.scrollTop = el.scrollHeight;
-                            }
-                        }
-                    """)
-                    page.wait_for_timeout(5000)
+            # Do NOT check for "no more transactions" — it may be in DOM but hidden
+            # Only stop when content stops growing
 
+            if current_lines == prev_line_count:
+                stall_count += 1
+                if stall_count >= 3:
+                    # Stalled — try multiple recovery methods
+                    recovered = False
+
+                    # Method 1: Aggressive mouse wheel
+                    for _ in range(15):
+                        page.mouse.wheel(0, 1500)
+                        page.wait_for_timeout(400)
+                    page.wait_for_timeout(8000)
                     current_text = page.inner_text("body")
-                    if len(current_text) > prev_text_len:
-                        break  # New content loaded!
+                    current_lines = current_text.count('\n')
+                    if current_lines > prev_line_count:
+                        recovered = True
 
-                if len(current_text) == prev_text_len:
-                    break  # Truly done after 5 retries
+                    # Method 2: Page Down spam
+                    if not recovered:
+                        for _ in range(20):
+                            page.keyboard.press("PageDown")
+                            page.wait_for_timeout(200)
+                        page.wait_for_timeout(8000)
+                        current_text = page.inner_text("body")
+                        current_lines = current_text.count('\n')
+                        if current_lines > prev_line_count:
+                            recovered = True
 
-            prev_text_len = len(current_text)
+                    # Method 3: Scroll specific containers
+                    if not recovered:
+                        page.evaluate("""
+                            document.querySelectorAll('*').forEach(el => {
+                                if (el.scrollHeight > el.clientHeight + 50 && el.clientHeight > 100) {
+                                    el.scrollTop = el.scrollHeight;
+                                }
+                            });
+                        """)
+                        page.wait_for_timeout(8000)
+                        current_text = page.inner_text("body")
+                        current_lines = current_text.count('\n')
+                        if current_lines > prev_line_count:
+                            recovered = True
+
+                    # Method 4: Move mouse to different position and scroll
+                    if not recovered:
+                        page.mouse.move(640, 600)
+                        for _ in range(15):
+                            page.mouse.wheel(0, 1000)
+                            page.wait_for_timeout(300)
+                        page.wait_for_timeout(8000)
+                        page.mouse.move(640, 400)  # Move back
+                        current_text = page.inner_text("body")
+                        current_lines = current_text.count('\n')
+                        if current_lines > prev_line_count:
+                            recovered = True
+
+                    if not recovered:
+                        # Give it one final long wait — maybe the server is slow
+                        page.wait_for_timeout(15000)
+                        current_text = page.inner_text("body")
+                        current_lines = current_text.count('\n')
+                        if current_lines == prev_line_count:
+                            break  # Truly done after exhausting all methods
+
+                    stall_count = 0
+            else:
+                stall_count = 0
+
+            prev_line_count = current_lines
 
             # Log progress
             with open("/tmp/enbd_scroll_progress.txt", "w") as f:
-                lines = current_text.count('\n')
-                f.write(f"Scroll {i}, text length: {current_len}, lines: {lines}")
+                # Count dates to estimate transaction count
+                date_count = sum(1 for line in current_text.split('\n')
+                                 if any(m in line for m in ['Jan ', 'Feb ', 'Mar ', 'Apr ', 'May ', 'Jun ',
+                                                             'Jul ', 'Aug ', 'Sep ', 'Oct ', 'Nov ', 'Dec ',
+                                                             'Today', 'Yesterday']))
+                f.write(f"Scroll {i} | Lines: {current_lines} | ~{date_count} transactions | Stalls: {stall_count}")
 
         return page.inner_text("body")
 

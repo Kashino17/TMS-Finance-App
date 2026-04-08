@@ -55,6 +55,12 @@ interface TmsApi {
     @GET("api/sync/enbd/status")
     suspend fun getEnbdSyncStatus(): Response<Map<String, String>>
 
+    @POST("api/ai/test-key")
+    suspend fun testKimiKey(@Body body: Map<String, String>): Response<Map<String, String>>
+
+    @POST("api/ai/categorize")
+    suspend fun aiCategorize(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Map<String, @JvmSuppressWildcards Any>>
+
     @POST("api/notifications")
     suspend fun postNotification(@Body notification: NotificationDto): Response<Map<String, String>>
 

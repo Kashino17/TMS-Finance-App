@@ -51,6 +51,13 @@ class SecureCredentialStore(context: Context) {
         get() = prefs.getString("fab_password", "") ?: ""
         set(value) = prefs.edit().putString("fab_password", value).apply()
 
+    // Kimi AI API Key
+    var kimiApiKey: String
+        get() = prefs.getString("kimi_api_key", "") ?: ""
+        set(value) = prefs.edit().putString("kimi_api_key", value).apply()
+
+    fun hasKimiApiKey(): Boolean = kimiApiKey.isNotBlank()
+
     fun clearAll() {
         prefs.edit().clear().apply()
     }
