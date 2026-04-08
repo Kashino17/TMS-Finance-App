@@ -20,6 +20,9 @@ dev = [
     "httpx",
 ]
 
+[project.scripts]
+tms-bank = "tms.cli:main"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/tms"]
 
