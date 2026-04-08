@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -31,28 +31,18 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
 
-      - name: Upload APK
+      - name: Rename APK
+        run: cp app/build/outputs/apk/release/app-release.apk app/build/outputs/apk/release/TMS-Banking.apk
+
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: tms-banking-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: TMS-Banking
+          path: android/app/build/outputs/apk/release/TMS-Banking.apk
           retention-days: 90
-
-  release:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download APK artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: tms-banking-debug
 
       - name: Get short SHA
         id: sha
@@ -61,13 +51,18 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ steps.sha.outputs.short }}
-          name: TMS Banking APK (build ${{ steps.sha.outputs.short }})
+          tag_name: v1.0-${{ steps.sha.outputs.short }}
+          name: TMS Banking v1.0 (${{ steps.sha.outputs.short }})
           body: |
-            Automatisch gebaute Debug-APK.
+            **TMS Banking** — Personal Finance Tracker
 
-            **Installation:** APK herunterladen und auf dem Galaxy Fold 7 installieren.
-            (Unter Einstellungen → Apps → Spezielle Berechtigungen → Unbekannte Apps installieren aktivieren)
-          files: app-debug.apk
+            Signierte Release-APK für Samsung Galaxy Fold 7.
+
+            **Installation:**
+            1. APK herunterladen
+            2. Auf dem Handy öffnen
+            3. Falls nötig: Einstellungen → Apps → Spezielle Berechtigungen → Unbekannte Apps installieren → Browser/Dateien erlauben
+            4. Installieren
+          files: android/app/build/outputs/apk/release/TMS-Banking.apk
           draft: false
           prerelease: false
