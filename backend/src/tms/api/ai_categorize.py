@@ -9,7 +9,7 @@ from tms.models import Transaction, Category
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
-KIMI_API_URL = "https://api.moonshot.cn/v1/chat/completions"
+KIMI_API_URL = "https://api.moonshot.ai/v1/chat/completions"
 
 
 class TestApiKeyRequest(BaseModel):
@@ -33,7 +33,7 @@ async def test_api_key(body: TestApiKeyRequest):
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "kimi-k2-0711",
+                    "model": "kimi-k2.5",
                     "messages": [{"role": "user", "content": "Say OK"}],
                     "max_tokens": 5,
                 },
@@ -120,7 +120,7 @@ No explanations, just the JSON array."""
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "kimi-k2-0711",
+                        "model": "kimi-k2.5",
                         "messages": [{"role": "user", "content": prompt}],
                         "max_tokens": 4000,
                         "temperature": 0.1,
