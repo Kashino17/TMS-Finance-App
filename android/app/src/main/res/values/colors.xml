@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="background">#1a1a2e</color>
+    <color name="surface">#16213e</color>
+    <color name="primary">#7c4dff</color>
+    <color name="positive">#4caf50</color>
+    <color name="negative">#ff6b6b</color>
+    <color name="bank_uae">#7eb8ff</color>
+    <color name="bank_revolut">#b07eff</color>
+    <color name="bank_sparkasse">#ff7e7e</color>
+    <color name="bank_staytris">#7effb0</color>
+    <color name="on_primary">#FFFFFF</color>
+    <color name="on_background">#E0E0E0</color>
+    <color name="on_surface">#BDBDBD</color>
+</resources>
