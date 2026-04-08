@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "com.tms.banking"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.tms.banking"
         minSdk = 28
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
 
