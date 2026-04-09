@@ -80,7 +80,7 @@ enum class DateFilter(val label: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CategoriesScreen(app: TmsApp) {
+fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
     val vm: CategoriesViewModel = viewModel(factory = CategoriesViewModel.Factory(app.container))
     val state by vm.uiState.collectAsStateWithLifecycle()
 
@@ -175,6 +175,11 @@ fun CategoriesScreen(app: TmsApp) {
         TopAppBar(
             title = {
                 Text("Categories", color = OnBackground, fontWeight = FontWeight.Bold)
+            },
+            actions = {
+                TextButton(onClick = onNavigateToSubscriptions) {
+                    Text("Abos", color = Primary, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
         )

@@ -32,6 +32,7 @@ import com.tms.banking.ui.categories.CategoriesScreen
 import com.tms.banking.ui.home.HomeScreen
 import com.tms.banking.ui.loans.LoansScreen
 import com.tms.banking.ui.settings.SettingsScreen
+import com.tms.banking.ui.subscriptions.SubscriptionsScreen
 import com.tms.banking.ui.theme.Background
 import com.tms.banking.ui.theme.OnSurface
 import com.tms.banking.ui.theme.Primary
@@ -43,6 +44,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Loans : Screen("loans", "Loans", Icons.Filled.AccountBalance)
     object Add : Screen("add", "Add", Icons.Filled.Add)
     object Settings : Screen("settings", "Settings", Icons.Filled.Settings)
+    object Subscriptions : Screen("subscriptions", "Subscriptions", Icons.Filled.Home)
     object AccountDetail : Screen("account/{accountId}", "Account", Icons.Filled.Home) {
         fun createRoute(accountId: Int) = "account/$accountId"
     }
@@ -116,7 +118,10 @@ fun TmsNavigation(app: TmsApp) {
                 )
             }
             composable(Screen.Categories.route) {
-                CategoriesScreen(app = app)
+                CategoriesScreen(
+                    app = app,
+                    onNavigateToSubscriptions = { navController.navigate(Screen.Subscriptions.route) }
+                )
             }
             composable(Screen.Loans.route) {
                 LoansScreen(app = app)
@@ -129,6 +134,12 @@ fun TmsNavigation(app: TmsApp) {
             }
             composable(Screen.Settings.route) {
                 SettingsScreen(app = app)
+            }
+            composable(Screen.Subscriptions.route) {
+                SubscriptionsScreen(
+                    app = app,
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
             composable(
                 route = Screen.AccountDetail.route,
