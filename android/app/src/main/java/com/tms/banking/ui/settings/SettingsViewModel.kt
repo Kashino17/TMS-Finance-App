@@ -162,7 +162,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     private suspend fun pollEnbdStatus(api: com.tms.banking.data.remote.TmsApi) {
-        repeat(60) { // Poll for up to 2 minutes (every 2s)
+        repeat(900) { // Poll for up to 30 minutes (every 2s)
             delay(2000)
             try {
                 val resp = api.getEnbdSyncStatus()

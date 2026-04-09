@@ -66,15 +66,19 @@ def _run_enbd_sync(username: str, password: str, full_sync: bool = False):
     from tms.connectors.enbd_api import ENBDApiClient
 
     try:
+        def update_status(msg):
+            _sync_status["enbd"] = "syncing"
+            _sync_message["enbd"] = msg
+
         client = ENBDApiClient(username, password)
 
         _sync_status["enbd"] = "waiting_smartpass"
         _sync_message["enbd"] = "Waiting for Smart Pass approval..."
 
-        accounts, transactions = client.sync(full_sync=full_sync)
+        accounts, transactions = client.sync(full_sync=full_sync, status_callback=update_status)
 
         _sync_status["enbd"] = "syncing"
-        _sync_message["enbd"] = f"Got {len(accounts)} accounts, {len(transactions)} transactions. Saving..."
+        _sync_message["enbd"] = f"Saving {len(transactions)} transactions..."
 
         # Save to database
         with Session(engine) as db:

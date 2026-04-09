@@ -18,7 +18,7 @@ class ENBDApiClient:
         self._captured_transactions = []
         self._captured_accounts = []
 
-    def sync(self, full_sync: bool = False) -> tuple[list[AccountBalance], list[RawTransaction]]:
+    def sync(self, full_sync: bool = False, status_callback=None) -> tuple[list[AccountBalance], list[RawTransaction]]:
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=False,
@@ -36,23 +36,34 @@ class ENBDApiClient:
 
             # Intercept ALL API responses and capture transaction/account data
             page.on("response", lambda resp: self._intercept_response(resp))
+            self._status_callback = status_callback
+
+            def _update_status(msg):
+                if self._status_callback:
+                    self._status_callback(msg)
 
             try:
+                _update_status("Opening Emirates NBD...")
                 self._login(page)
+                _update_status("Waiting for Smart Pass approval...")
                 self._wait_for_smart_pass(page)
 
-                # Dashboard loaded — account data already captured from API calls
+                _update_status("Logged in! Loading dashboard...")
                 page.wait_for_timeout(5000)
 
-                # Navigate to transaction list
+                _update_status("Opening transactions...")
                 try:
                     page.locator('text=/VIEW ALL/i').first.click()
                     page.wait_for_timeout(5000)
                 except:
                     pass
 
-                # Scroll to trigger more API pagination calls
-                self._scroll_for_api_calls(page)
+                if full_sync:
+                    _update_status("Full Backlog: scrolling through all transactions...")
+                    self._scroll_for_api_calls(page)
+                else:
+                    _update_status("Quick Sync: loading recent transactions...")
+                    page.wait_for_timeout(5000)  # Just wait for initial API calls
 
                 # Parse captured data
                 accounts = self._parse_captured_accounts()
@@ -198,6 +209,9 @@ class ENBDApiClient:
             )
             with open("/tmp/enbd_api_progress.txt", "w") as f:
                 f.write(f"Scroll {i} | API pages: {current_count} | Raw txns: {total_txns} | Stalls: {stall_count}")
+
+            if self._status_callback:
+                self._status_callback(f"Loading transactions... {total_txns} found")
 
     def _parse_captured_accounts(self) -> list[AccountBalance]:
         accounts = []
