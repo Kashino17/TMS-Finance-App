@@ -152,6 +152,10 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
     }
 
     val totalSpend = donutSlices.sumOf { it.value }
+    val filteredSpend = remember(donutSlices, selectedDonutIndices) {
+        if (selectedDonutIndices.isEmpty()) totalSpend
+        else donutSlices.filterIndexed { i, _ -> i in selectedDonutIndices }.sumOf { it.value }
+    }
 
     if (showDatePicker) {
         val pickerState = rememberDateRangePickerState()
@@ -214,7 +218,7 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
                         Text("Total Spent", color = OnSurface, fontSize = 13.sp)
                         Spacer(modifier = Modifier.height(4.dp))
                         AnimatedContent(
-                            targetState = formatAmount(totalSpend, "AED"),
+                            targetState = formatAmount(filteredSpend, "AED"),
                             transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(150)) },
                             label = "total_anim"
                         ) { amount ->
@@ -266,7 +270,7 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
                             DonutChart(
                                 slices = donutSlices,
                                 totalLabel = if (state.selectedCategoryIds.isEmpty()) dateFilter.label else "${state.selectedCategoryIds.size} selected",
-                                totalValue = formatAmount(totalSpend, "AED"),
+                                totalValue = formatAmount(filteredSpend, "AED"),
                                 modifier = Modifier.fillMaxWidth(),
                                 onSliceClick = { index ->
                                     val catName = donutSlices.getOrNull(index)?.label
