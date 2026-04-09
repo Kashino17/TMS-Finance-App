@@ -12,6 +12,7 @@ import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
+import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.HTTP
 import retrofit2.http.PATCH
@@ -85,6 +86,21 @@ interface TmsApi {
 
     @POST("api/notifications")
     suspend fun postNotification(@Body notification: NotificationDto): Response<Map<String, String>>
+
+    @GET("api/analytics/monthly-summary")
+    suspend fun getMonthlySummary(): List<Map<String, @JvmSuppressWildcards Any?>>
+
+    @GET("api/recurring")
+    suspend fun getRecurring(): List<Map<String, @JvmSuppressWildcards Any?>>
+
+    @GET("api/budgets")
+    suspend fun getBudgets(): List<Map<String, @JvmSuppressWildcards Any?>>
+
+    @POST("api/budgets")
+    suspend fun createBudget(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Map<String, @JvmSuppressWildcards Any>>
+
+    @HTTP(method = "DELETE", path = "api/budgets/{id}", hasBody = false)
+    suspend fun deleteBudget(@Path("id") id: Int): Response<Map<String, String>>
 
     companion object {
         fun sanitizeUrl(input: String): String {

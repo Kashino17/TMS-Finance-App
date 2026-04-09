@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.tms.banking.AppContainer
 import com.tms.banking.data.local.entity.CategoryEntity
 import com.tms.banking.data.local.entity.TransactionEntity
+import com.tms.banking.data.remote.TmsApi
 import com.tms.banking.data.repository.CategoryRepository
 import com.tms.banking.data.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -22,13 +23,43 @@ data class CategorySpend(
     val count: Int
 )
 
+data class MonthlySummaryEntry(
+    val month: String,
+    val income: Double,
+    val expenses: Double,
+    val net: Double
+)
+
+data class RecurringEntry(
+    val merchant: String,
+    val avgAmount: Double,
+    val frequency: String,
+    val lastDate: String,
+    val nextEstimated: String?,
+    val category: String?,
+    val count: Int
+)
+
+data class BudgetEntry(
+    val id: Int,
+    val categoryId: Int,
+    val categoryName: String,
+    val amountLimit: Double,
+    val spent: Double,
+    val percentage: Double,
+    val period: String
+)
+
 data class CategoriesUiState(
     val categorySpends: List<CategorySpend> = emptyList(),
     val transactions: List<TransactionEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
     val selectedCategoryId: Int? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val monthlySummary: List<MonthlySummaryEntry> = emptyList(),
+    val recurring: List<RecurringEntry> = emptyList(),
+    val budgets: List<BudgetEntry> = emptyList()
 )
 
 class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
@@ -38,6 +69,7 @@ class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
 
     private var categoryRepo: CategoryRepository? = null
     private var transactionRepo: TransactionRepository? = null
+    private var api: TmsApi? = null
 
     init {
         viewModelScope.launch {
@@ -49,10 +81,12 @@ class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
     }
 
     private fun initRepositories(url: String) {
-        val api = container.buildApi(url)
-        categoryRepo = container.categoryRepository(api)
-        transactionRepo = container.transactionRepository(api)
+        val builtApi = container.buildApi(url)
+        api = builtApi
+        categoryRepo = container.categoryRepository(builtApi)
+        transactionRepo = container.transactionRepository(builtApi)
         observeData()
+        loadAnalytics()
     }
 
     private fun observeData() {
@@ -88,6 +122,61 @@ class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
                     categories = categories
                 )
             }
+        }
+    }
+
+    private fun loadAnalytics() {
+        val tmsApi = api ?: return
+        viewModelScope.launch {
+            // Monthly summary
+            try {
+                val raw = tmsApi.getMonthlySummary()
+                val parsed = raw.map { m ->
+                    MonthlySummaryEntry(
+                        month = m["month"]?.toString() ?: "",
+                        income = (m["income"] as? Number)?.toDouble() ?: 0.0,
+                        expenses = (m["expenses"] as? Number)?.toDouble() ?: 0.0,
+                        net = (m["net"] as? Number)?.toDouble() ?: 0.0
+                    )
+                }
+                _uiState.value = _uiState.value.copy(monthlySummary = parsed)
+            } catch (_: Exception) {}
+        }
+        viewModelScope.launch {
+            // Recurring
+            try {
+                val raw = tmsApi.getRecurring()
+                val parsed = raw.map { m ->
+                    RecurringEntry(
+                        merchant = m["merchant"]?.toString() ?: "",
+                        avgAmount = (m["avg_amount"] as? Number)?.toDouble() ?: 0.0,
+                        frequency = m["frequency"]?.toString() ?: "",
+                        lastDate = m["last_date"]?.toString() ?: "",
+                        nextEstimated = m["next_estimated"]?.toString(),
+                        category = m["category"]?.toString(),
+                        count = (m["count"] as? Number)?.toInt() ?: 0
+                    )
+                }
+                _uiState.value = _uiState.value.copy(recurring = parsed)
+            } catch (_: Exception) {}
+        }
+        viewModelScope.launch {
+            // Budgets
+            try {
+                val raw = tmsApi.getBudgets()
+                val parsed = raw.map { m ->
+                    BudgetEntry(
+                        id = (m["id"] as? Number)?.toInt() ?: 0,
+                        categoryId = (m["category_id"] as? Number)?.toInt() ?: 0,
+                        categoryName = m["category_name"]?.toString() ?: "",
+                        amountLimit = (m["amount_limit"] as? Number)?.toDouble() ?: 0.0,
+                        spent = (m["spent"] as? Number)?.toDouble() ?: 0.0,
+                        percentage = (m["percentage"] as? Number)?.toDouble() ?: 0.0,
+                        period = m["period"]?.toString() ?: "monthly"
+                    )
+                }
+                _uiState.value = _uiState.value.copy(budgets = parsed)
+            } catch (_: Exception) {}
         }
     }
 
