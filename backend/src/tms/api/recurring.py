@@ -57,15 +57,38 @@ def _detect_recurring(db: Session) -> list[dict]:
         .all()
     )
 
-    # Case-insensitive grouping + merge duplicates
+    import re
+
+    def normalize_merchant(name: str) -> str:
+        """Strip transaction IDs, reference numbers, and suffixes from merchant names.
+        'Spotify P36FD3A3C2' → 'spotify'
+        'SHOPIFY* 492692393' → 'shopify'
+        'Google CLOUD LLQMXK' → 'google cloud'
+        'FACEBK *Djx5mc5a22' → 'facebk'
+        """
+        n = name.strip().lower()
+        # Remove everything after * (including *)
+        n = re.sub(r'\s*\*\s*.*', '', n)
+        # Remove trailing alphanumeric IDs (6+ chars of hex/alphanum)
+        n = re.sub(r'\s+[a-z0-9]{6,}$', '', n)
+        # Remove trailing pure numbers (like order IDs)
+        n = re.sub(r'\s+\d{4,}$', '', n)
+        # Remove trailing reference patterns like "p36fd3a3c2"
+        n = re.sub(r'\s+p[a-f0-9]{8,}$', '', n)
+        return n.strip()
+
+    # Group by normalized merchant name
     by_merchant: dict[str, list[Transaction]] = {}
-    merchant_display: dict[str, str] = {}  # lowercase → display name
+    merchant_display: dict[str, str] = {}
     for txn in transactions:
         merchant = txn.merchant_name.strip()
         if not merchant:
             continue
-        key = merchant.lower()
+        key = normalize_merchant(merchant)
+        if not key:
+            continue
         by_merchant.setdefault(key, []).append(txn)
+        # Keep the most common display name
         if key not in merchant_display:
             merchant_display[key] = merchant
 
@@ -180,7 +203,9 @@ def _detect_recurring(db: Session) -> list[dict]:
             "cancel_url": cancel_url,
         })
 
-    results.sort(key=lambda r: r["avg_amount"])
+    # Sort: active first, then pending, then inactive; within each group by amount
+    status_order = {"active": 0, "pending": 1, "inactive": 2}
+    results.sort(key=lambda r: (status_order.get(r["status"], 9), r["avg_amount"]))
     return results
 
 
@@ -202,3 +227,40 @@ def get_business_recurring(db: Session = Depends(get_db)):
     """Business recurring expenses only."""
     all_recurring = _detect_recurring(db)
     return [r for r in all_recurring if r["category_type"] == "business"]
+
+
+@router.get("/transactions/{merchant}")
+def get_merchant_transactions(merchant: str, db: Session = Depends(get_db)):
+    """Get all transactions for a specific merchant (for detail view)."""
+    import re
+
+    def normalize(name: str) -> str:
+        n = name.strip().lower()
+        n = re.sub(r'\s*\*\s*.*', '', n)
+        n = re.sub(r'\s+[a-z0-9]{6,}$', '', n)
+        n = re.sub(r'\s+\d{4,}$', '', n)
+        n = re.sub(r'\s+p[a-f0-9]{8,}$', '', n)
+        return n.strip()
+
+    merchant_lower = merchant.lower()
+    transactions = (
+        db.query(Transaction)
+        .filter(Transaction.merchant_name.isnot(None))
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+
+    matching = []
+    for txn in transactions:
+        if normalize(txn.merchant_name) == merchant_lower:
+            matching.append({
+                "id": txn.id,
+                "date": txn.date.isoformat(),
+                "amount": txn.amount,
+                "amount_aed": txn.amount_aed,
+                "currency": txn.currency,
+                "merchant_name": txn.merchant_name,
+                "description": txn.description,
+            })
+
+    return matching
