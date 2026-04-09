@@ -1,22 +1,24 @@
-"""Emirates NBD Direct API Client — makes API calls from within the browser session.
-No scrolling needed — fetches ALL transactions via cursor-based pagination."""
+"""Emirates NBD API Interceptor — captures transaction data from ENBD's own API calls.
+Login via browser, click VIEW ALL, scroll to trigger API pagination,
+and intercept all response bodies. No custom fetch() needed."""
 import json
+import re
 from datetime import date, datetime
 from playwright.sync_api import sync_playwright, Page
-import re
 from tms.connectors.base import RawTransaction, AccountBalance
 
 ENBD_LOGIN_URL = "https://online.emiratesnbd.com/"
-SMART_PASS_TIMEOUT_MS = 600_000  # 10 minutes
+SMART_PASS_TIMEOUT_MS = 600_000
 
 
 class ENBDApiClient:
     def __init__(self, username: str, password: str):
         self.username = username
         self.password = password
+        self._captured_transactions = []
+        self._captured_accounts = []
 
     def sync(self, full_sync: bool = False) -> tuple[list[AccountBalance], list[RawTransaction]]:
-        """Login via browser, then use fetch() from browser to call ENBD API directly."""
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=False,
@@ -32,17 +34,91 @@ class ENBDApiClient:
             context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             page = context.new_page()
 
+            # Intercept ALL API responses and capture transaction/account data
+            page.on("response", lambda resp: self._intercept_response(resp))
+
             try:
                 self._login(page)
                 self._wait_for_smart_pass(page)
 
-                # Now logged in — make API calls from the browser
-                accounts = self._fetch_accounts(page)
-                transactions = self._fetch_all_transactions(page)
+                # Dashboard loaded — account data already captured from API calls
+                page.wait_for_timeout(5000)
+
+                # Navigate to transaction list
+                try:
+                    page.locator('text=/VIEW ALL/i').first.click()
+                    page.wait_for_timeout(5000)
+                except:
+                    pass
+
+                # Scroll to trigger more API pagination calls
+                self._scroll_for_api_calls(page)
+
+                # Parse captured data
+                accounts = self._parse_captured_accounts()
+                transactions = self._parse_captured_transactions()
+
+                with open("/tmp/enbd_api_result.txt", "w") as f:
+                    f.write(f"Captured {len(self._captured_accounts)} account responses\n")
+                    f.write(f"Captured {len(self._captured_transactions)} transaction responses\n")
+                    f.write(f"Parsed {len(accounts)} accounts, {len(transactions)} transactions\n")
+                    if transactions:
+                        f.write(f"Newest: {transactions[0].date}\nOldest: {transactions[-1].date}\n")
 
                 return accounts, transactions
             finally:
                 browser.close()
+
+    def _intercept_response(self, response):
+        """Capture API responses that contain account or transaction data."""
+        try:
+            url = response.url
+            if response.status != 200:
+                return
+
+            # Capture account summary
+            if "accounts/v1/summary" in url or "deposits/summary" in url:
+                try:
+                    body = response.json()
+                    self._captured_accounts.append({"type": "account", "data": body})
+                except:
+                    pass
+
+            # Capture credit cards
+            if "creditcards/v1/list" in url:
+                try:
+                    body = response.json()
+                    self._captured_accounts.append({"type": "card", "data": body})
+                except:
+                    pass
+
+            # Capture transactions
+            if "global-transactions" in url and "transactions" in url:
+                try:
+                    body = response.json()
+                    self._captured_transactions.append(body)
+
+                    # Log progress
+                    total = sum(
+                        len(r.get("transactions", r.get("results", [])))
+                        for r in self._captured_transactions
+                    )
+                    with open("/tmp/enbd_api_progress.txt", "w") as f:
+                        f.write(f"API pages: {len(self._captured_transactions)} | Raw txns: {total}")
+                except:
+                    pass
+
+            # Capture loans
+            if "loans/v2/list" in url:
+                try:
+                    body = response.json()
+                    with open("/tmp/enbd_api_loans.txt", "w") as f:
+                        f.write(json.dumps(body, indent=2, default=str)[:5000])
+                except:
+                    pass
+
+        except:
+            pass
 
     def _login(self, page: Page):
         page.goto(ENBD_LOGIN_URL, wait_until="domcontentloaded", timeout=60_000)
@@ -58,12 +134,9 @@ class ENBDApiClient:
                     pass
             page.wait_for_selector('input', timeout=15_000)
 
-        username_input = page.locator('input[type="text"], input[type="email"]').first
-        username_input.fill(self.username)
-        password_input = page.locator('input[type="password"]').first
-        password_input.fill(self.password)
-        login_btn = page.locator('button:has-text("LOGIN"), button:has-text("Login"), input[type="submit"]').first
-        login_btn.click()
+        page.locator('input[type="text"], input[type="email"]').first.fill(self.username)
+        page.locator('input[type="password"]').first.fill(self.password)
+        page.locator('button:has-text("LOGIN"), button:has-text("Login"), input[type="submit"]').first.click()
 
     def _wait_for_smart_pass(self, page: Page):
         try:
@@ -76,123 +149,106 @@ class ENBDApiClient:
                 page.wait_for_selector('text=/ACCOUNTS|RECENT TRANSACTIONS/i', timeout=10_000)
             except:
                 raise TimeoutError("Smart Pass was not approved in time.")
-        page.wait_for_timeout(5000)  # Let dashboard fully load
 
-    def _browser_fetch(self, page: Page, url: str) -> dict | list | None:
-        """Make a fetch() call from within the browser — uses the browser's session cookies & auth."""
-        result = page.evaluate(f"""
-            async () => {{
-                try {{
-                    const resp = await fetch("{url}");
-                    if (!resp.ok) return {{ _error: resp.status, _body: await resp.text() }};
-                    return await resp.json();
-                }} catch (e) {{
-                    return {{ _error: "fetch_failed", _body: e.message }};
-                }}
-            }}
-        """)
-        if isinstance(result, dict) and "_error" in result:
-            with open("/tmp/enbd_api_fetch_error.txt", "a") as f:
-                f.write(f"{url} → {result['_error']}: {str(result.get('_body', ''))[:200]}\n")
-            return None
-        return result
+    def _scroll_for_api_calls(self, page: Page):
+        """Scroll to trigger ENBD's infinite scroll which makes API pagination calls.
+        We capture the responses via the interceptor — no DOM parsing needed."""
+        prev_count = 0
+        stall_count = 0
+        page.mouse.move(640, 400)
 
-    def _fetch_accounts(self, page: Page) -> list[AccountBalance]:
+        for i in range(30000):
+            # Scroll
+            for _ in range(5):
+                page.mouse.wheel(0, 600)
+                page.wait_for_timeout(200)
+            page.wait_for_timeout(3000)
+
+            # Check how many transaction API responses we've captured
+            current_count = len(self._captured_transactions)
+
+            if current_count == prev_count:
+                stall_count += 1
+                if stall_count >= 5:
+                    # Try harder
+                    for _ in range(15):
+                        page.mouse.wheel(0, 1500)
+                        page.wait_for_timeout(400)
+                    page.wait_for_timeout(8000)
+
+                    if len(self._captured_transactions) == current_count:
+                        # Try PageDown
+                        for _ in range(20):
+                            page.keyboard.press("PageDown")
+                            page.wait_for_timeout(200)
+                        page.wait_for_timeout(8000)
+
+                        if len(self._captured_transactions) == current_count:
+                            break  # No new API calls — we've reached the end
+                    stall_count = 0
+            else:
+                stall_count = 0
+
+            prev_count = current_count
+
+            # Progress
+            total_txns = sum(
+                len(r.get("transactions", r.get("results", [])))
+                for r in self._captured_transactions
+            )
+            with open("/tmp/enbd_api_progress.txt", "w") as f:
+                f.write(f"Scroll {i} | API pages: {current_count} | Raw txns: {total_txns} | Stalls: {stall_count}")
+
+    def _parse_captured_accounts(self) -> list[AccountBalance]:
         accounts = []
+        for captured in self._captured_accounts:
+            data = captured["data"]
+            if captured["type"] == "account":
+                for acc in data.get("accounts", data if isinstance(data, list) else []):
+                    try:
+                        accounts.append(AccountBalance(
+                            external_id=str(acc.get("accountNumber", acc.get("id", ""))),
+                            name=f"ENBD {acc.get('productName', acc.get('type', 'Account'))}",
+                            currency=acc.get("currency", "AED"),
+                            balance=float(acc.get("availableBalance", acc.get("balance", 0))),
+                        ))
+                    except:
+                        pass
+            elif captured["type"] == "card":
+                for card in data.get("creditCards", data if isinstance(data, list) else []):
+                    try:
+                        accounts.append(AccountBalance(
+                            external_id=str(card.get("cardNumber", card.get("id", ""))),
+                            name=f"ENBD {card.get('productName', card.get('cardType', 'Card'))}",
+                            currency=card.get("currency", "AED"),
+                            balance=-abs(float(card.get("outstandingBalance", card.get("balance", 0)))),
+                        ))
+                    except:
+                        pass
 
-        # Current/Savings accounts
-        data = self._browser_fetch(page, "https://apionline.emiratesnbd.com/a/o/retail/accounts/v1/summary")
-        if data:
+        # Save first response for debugging
+        if self._captured_accounts:
             with open("/tmp/enbd_api_accounts_raw.txt", "w") as f:
-                f.write(json.dumps(data, indent=2, default=str)[:5000])
-            accts = data.get("accounts", data if isinstance(data, list) else [])
-            for acc in accts:
-                try:
-                    accounts.append(AccountBalance(
-                        external_id=str(acc.get("accountNumber", acc.get("id", ""))),
-                        name=f"ENBD {acc.get('productName', acc.get('type', 'Account'))}",
-                        currency=acc.get("currency", "AED"),
-                        balance=float(acc.get("availableBalance", acc.get("balance", 0))),
-                    ))
-                except:
-                    pass
-
-        # Credit cards
-        data = self._browser_fetch(page, "https://apionline.emiratesnbd.com/a/o/retail/creditcards/v1/list")
-        if data:
-            with open("/tmp/enbd_api_cards_raw.txt", "w") as f:
-                f.write(json.dumps(data, indent=2, default=str)[:5000])
-            cards = data.get("creditCards", data if isinstance(data, list) else [])
-            for card in cards:
-                try:
-                    accounts.append(AccountBalance(
-                        external_id=str(card.get("cardNumber", card.get("id", ""))),
-                        name=f"ENBD {card.get('productName', card.get('cardType', 'Card'))}",
-                        currency=card.get("currency", "AED"),
-                        balance=-abs(float(card.get("outstandingBalance", card.get("balance", 0)))),
-                    ))
-                except:
-                    pass
-
-        with open("/tmp/enbd_api_accounts_result.txt", "w") as f:
-            for a in accounts:
-                f.write(f"{a.name} | {a.currency} {a.balance}\n")
+                f.write(json.dumps(self._captured_accounts[0]["data"], indent=2, default=str)[:5000])
 
         return accounts
 
-    def _fetch_all_transactions(self, page: Page) -> list[RawTransaction]:
-        """Fetch ALL transactions using cursor-based pagination via browser fetch()."""
-        all_transactions = []
-        cursor = ""
-        page_num = 0
-
-        # Clear error log
-        with open("/tmp/enbd_api_fetch_error.txt", "w") as f:
-            f.write("")
-
-        while True:
-            page_num += 1
-            size = 300 if page_num == 1 else 50
-
-            url = f"https://apionline.emiratesnbd.com/a/o/retail/global-transactions/v1/transactions?productType=seeAll&size={size}&tranStatus=all"
-            if cursor:
-                url += f"&next={cursor}"
-
-            data = self._browser_fetch(page, url)
-            if not data:
-                break
+    def _parse_captured_transactions(self) -> list[RawTransaction]:
+        all_txns = []
+        for response_data in self._captured_transactions:
+            txns = response_data.get("transactions", response_data.get("results", []))
 
             # Save first page for debugging
-            if page_num == 1:
+            if not all_txns and txns:
                 with open("/tmp/enbd_api_txn_sample.txt", "w") as f:
-                    f.write(json.dumps(data, indent=2, default=str)[:10000])
-
-            # Extract transactions
-            txns = data.get("transactions", data.get("results", []))
-            if not txns:
-                break
+                    f.write(json.dumps(txns[:3], indent=2, default=str)[:5000])
 
             for txn in txns:
                 raw = self._parse_transaction(txn)
                 if raw:
-                    all_transactions.append(raw)
+                    all_txns.append(raw)
 
-            # Get next cursor
-            cursor = data.get("next", data.get("nextCursor", ""))
-            if not cursor:
-                break
-
-            # Progress
-            with open("/tmp/enbd_api_progress.txt", "w") as f:
-                oldest = all_transactions[-1].date if all_transactions else "?"
-                f.write(f"Page {page_num} | Total: {len(all_transactions)} | Oldest: {oldest}")
-
-        with open("/tmp/enbd_api_result.txt", "w") as f:
-            f.write(f"Total: {len(all_transactions)}\n")
-            if all_transactions:
-                f.write(f"Newest: {all_transactions[0].date}\nOldest: {all_transactions[-1].date}\n")
-
-        return all_transactions
+        return all_txns
 
     def _parse_transaction(self, txn: dict) -> RawTransaction | None:
         try:
