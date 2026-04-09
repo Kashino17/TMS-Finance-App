@@ -18,8 +18,10 @@ class AccountRepository(
     suspend fun refreshAccounts(): Result<Unit> {
         return try {
             val accounts = api.getAccounts()
-            accountDao.deleteAll()
-            accountDao.insertAccounts(accounts.map { it.toEntity() })
+            if (accounts.isNotEmpty()) {
+                accountDao.deleteAll()
+                accountDao.insertAccounts(accounts.map { it.toEntity() })
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

@@ -18,8 +18,10 @@ class CategoryRepository(
     suspend fun refreshCategories(): Result<Unit> {
         return try {
             val categories = api.getCategories()
-            categoryDao.deleteAll()
-            categoryDao.insertCategories(categories.map { it.toEntity() })
+            if (categories.isNotEmpty()) {
+                categoryDao.deleteAll()
+                categoryDao.insertCategories(categories.map { it.toEntity() })
+            }
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)

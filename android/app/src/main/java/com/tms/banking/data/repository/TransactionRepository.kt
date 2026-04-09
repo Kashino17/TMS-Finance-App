@@ -22,14 +22,18 @@ class TransactionRepository(
     suspend fun refreshTransactions(accountId: Int? = null, limit: Int = 5000, offset: Int = 0): Result<Unit> {
         return try {
             val transactions = api.getTransactions(accountId, limit, offset)
-            if (accountId != null) {
-                transactionDao.deleteByAccount(accountId)
-            } else {
-                transactionDao.deleteAll()
+            // Only replace local data if we got data back from backend
+            if (transactions.isNotEmpty()) {
+                if (accountId != null) {
+                    transactionDao.deleteByAccount(accountId)
+                } else {
+                    transactionDao.deleteAll()
+                }
+                transactionDao.insertTransactions(transactions.map { it.toEntity() })
             }
-            transactionDao.insertTransactions(transactions.map { it.toEntity() })
             Result.success(Unit)
         } catch (e: Exception) {
+            // Backend unreachable — keep local data, don't delete anything
             Result.failure(e)
         }
     }

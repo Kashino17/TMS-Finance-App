@@ -1,5 +1,6 @@
-"""AI-powered transaction categorization using Kimi K 2.5 (Moonshot API)."""
+"""AI-powered transaction categorization using Kimi Code (Anthropic Messages API)."""
 import json
+import re
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -9,7 +10,8 @@ from tms.models import Transaction, Category
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
-KIMI_API_URL = "https://api.kimi.ai/v1/chat/completions"
+KIMI_API_URL = "https://api.kimi.com/coding/v1/messages"
+KIMI_MODEL = "kimi-for-coding"
 
 
 class TestApiKeyRequest(BaseModel):
@@ -18,55 +20,45 @@ class TestApiKeyRequest(BaseModel):
 
 class CategorizeRequest(BaseModel):
     api_key: str
-    batch_size: int = 30  # How many transactions per AI call
+    batch_size: int = 30
 
 
 @router.post("/test-key")
 async def test_api_key(body: TestApiKeyRequest):
-    """Test if the Kimi API key works."""
+    """Test if the Kimi Code API key works."""
     key = body.api_key.strip()
     key_preview = f"{key[:8]}...{key[-4:]}" if len(key) > 12 else "too_short"
-
-    # Log for debugging
-    with open("/tmp/enbd_kimi_debug.txt", "w") as f:
-        f.write(f"Key length: {len(key)}\n")
-        f.write(f"Key preview: {key_preview}\n")
-        f.write(f"Key starts with: {key[:3]}\n")
-        f.write(f"URL: {KIMI_API_URL}\n")
 
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 KIMI_API_URL,
                 headers={
-                    "Authorization": f"Bearer {key}",
+                    "x-api-key": key,
+                    "anthropic-version": "2023-06-01",
                     "Content-Type": "application/json",
                 },
                 json={
-                    "model": "kimi-k2.5",
+                    "model": KIMI_MODEL,
+                    "max_tokens": 10,
                     "messages": [{"role": "user", "content": "Say OK"}],
-                    "max_tokens": 5,
                 },
             )
 
-            # Log full response
-            with open("/tmp/enbd_kimi_debug.txt", "a") as f:
-                f.write(f"Status: {resp.status_code}\n")
-                f.write(f"Response: {resp.text[:500]}\n")
+            with open("/tmp/enbd_kimi_debug.txt", "w") as f:
+                f.write(f"URL: {KIMI_API_URL}\nKey: {key_preview}\nStatus: {resp.status_code}\nResponse: {resp.text[:500]}\n")
 
             if resp.status_code == 200:
                 return {"status": "success", "message": "API key works!"}
             elif resp.status_code == 401:
-                return {"status": "error", "message": f"401 Unauthorized — Key: {key_preview} | Response: {resp.text[:100]}"}
+                return {"status": "error", "message": f"401 — Invalid API key ({key_preview})"}
             elif resp.status_code == 403:
-                return {"status": "error", "message": "403 Forbidden — API key has no access"}
-            elif resp.status_code == 429:
-                return {"status": "error", "message": "429 Rate Limited — Too many requests"}
+                return {"status": "error", "message": f"403 — Access forbidden ({resp.text[:100]})"}
             else:
-                detail = resp.text[:200]
-                return {"status": "error", "message": f"{resp.status_code}: {detail}"}
+                return {"status": "error", "message": f"{resp.status_code}: {resp.text[:150]}"}
+
     except httpx.TimeoutException:
-        return {"status": "error", "message": "Timeout — Kimi API not reachable"}
+        return {"status": "error", "message": "Timeout — API not reachable"}
     except Exception as e:
         return {"status": "error", "message": f"Error: {str(e)[:200]}"}
 
@@ -74,12 +66,10 @@ async def test_api_key(body: TestApiKeyRequest):
 @router.post("/categorize")
 async def categorize_transactions(body: CategorizeRequest, db: Session = Depends(get_db)):
     """Use Kimi AI to categorize uncategorized transactions."""
-    # Get all categories
     categories = db.query(Category).filter(Category.parent_id.is_(None)).all()
     cat_map = {c.name: c.id for c in categories}
     cat_list = [f"{c.name} ({c.icon})" for c in categories]
 
-    # Get uncategorized transactions
     uncategorized = (
         db.query(Transaction)
         .filter(Transaction.category_id.is_(None))
@@ -93,7 +83,6 @@ async def categorize_transactions(body: CategorizeRequest, db: Session = Depends
     total_categorized = 0
     errors = []
 
-    # Process in batches
     for i in range(0, len(uncategorized), body.batch_size):
         batch = uncategorized[i:i + body.batch_size]
 
@@ -132,14 +121,14 @@ No explanations, just the JSON array."""
                 resp = await client.post(
                     KIMI_API_URL,
                     headers={
-                        "Authorization": f"Bearer {body.api_key}",
+                        "x-api-key": body.api_key,
+                        "anthropic-version": "2023-06-01",
                         "Content-Type": "application/json",
                     },
                     json={
-                        "model": "kimi-k2.5",
-                        "messages": [{"role": "user", "content": prompt}],
+                        "model": KIMI_MODEL,
                         "max_tokens": 4000,
-                        "temperature": 0.1,
+                        "messages": [{"role": "user", "content": prompt}],
                     },
                 )
 
@@ -147,9 +136,13 @@ No explanations, just the JSON array."""
                     errors.append(f"Batch {i//body.batch_size}: HTTP {resp.status_code}")
                     continue
 
-                content = resp.json()["choices"][0]["message"]["content"]
+                # Anthropic Messages API returns content differently
+                resp_json = resp.json()
+                content = ""
+                for block in resp_json.get("content", []):
+                    if block.get("type") == "text":
+                        content += block.get("text", "")
 
-                # Extract JSON from response (might be wrapped in ```json ... ```)
                 content = content.strip()
                 if content.startswith("```"):
                     content = content.split("\n", 1)[1] if "\n" in content else content[3:]
@@ -159,8 +152,6 @@ No explanations, just the JSON array."""
                 try:
                     assignments = json.loads(content)
                 except json.JSONDecodeError:
-                    # Try to find JSON array in the response
-                    import re
                     match = re.search(r'\[.*\]', content, re.DOTALL)
                     if match:
                         assignments = json.loads(match.group())
