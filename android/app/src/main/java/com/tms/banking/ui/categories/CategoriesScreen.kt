@@ -184,39 +184,63 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
         )
 
+        // Find selected donut index for highlighting
+        val selectedDonutIndex = remember(state.selectedCategoryId, donutSlices, state.categories) {
+            if (state.selectedCategoryId == null) null
+            else {
+                val catName = state.categories.find { it.id == state.selectedCategoryId }?.name
+                donutSlices.indexOfFirst { it.label == catName }.takeIf { it >= 0 }
+            }
+        }
+
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(16.dp)
+            contentPadding = PaddingValues(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Date filter chips
+            // 1. Spending Summary + Date Filter (together)
             item {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = SurfaceVariant)
                 ) {
-                    DateFilter.entries.forEach { filter ->
-                        FilterChip(
-                            selected = dateFilter == filter,
-                            onClick = {
-                                if (filter == DateFilter.CUSTOM) showDatePicker = true
-                                else dateFilter = filter
-                            },
-                            label = { Text(filter.label, fontSize = 11.sp) },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Primary.copy(alpha = 0.2f),
-                                selectedLabelColor = Primary,
-                                containerColor = Surface,
-                                labelColor = OnSurface
-                            )
+                    Column(modifier = Modifier.padding(20.dp)) {
+                        Text("Total Spent", color = OnSurface, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            formatAmount(totalSpend, "AED"),
+                            color = Negative,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 28.sp
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            DateFilter.entries.forEach { filter ->
+                                FilterChip(
+                                    selected = dateFilter == filter,
+                                    onClick = {
+                                        if (filter == DateFilter.CUSTOM) showDatePicker = true
+                                        else dateFilter = filter
+                                    },
+                                    label = { Text(filter.label, fontSize = 11.sp) },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = Primary.copy(alpha = 0.3f),
+                                        selectedLabelColor = Primary,
+                                        containerColor = Surface,
+                                        labelColor = OnSurface
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
-                Spacer(modifier = Modifier.height(12.dp))
             }
 
-            // Donut chart
+            // 2. Donut Chart with interactive legend (legend = category filter)
             item {
                 if (donutSlices.isNotEmpty()) {
                     Card(
@@ -225,98 +249,64 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
                         colors = CardDefaults.cardColors(containerColor = Surface)
                     ) {
                         Column(modifier = Modifier.padding(20.dp)) {
-                            Text(
-                                "Spending Breakdown",
-                                color = OnBackground,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 16.sp
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Spending Breakdown", color = OnBackground, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                            Text("Tap a category to filter", color = OnSurface.copy(alpha = 0.6f), fontSize = 11.sp)
+                            Spacer(modifier = Modifier.height(12.dp))
                             DonutChart(
                                 slices = donutSlices,
                                 totalLabel = dateFilter.label,
                                 totalValue = formatAmount(totalSpend, "AED"),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth(),
+                                onSliceClick = { index ->
+                                    val catName = donutSlices.getOrNull(index)?.label
+                                    val catId = state.categories.find { it.name == catName }?.id
+                                    if (catId == state.selectedCategoryId) {
+                                        vm.selectCategory(null) // Deselect
+                                    } else {
+                                        vm.selectCategory(catId)
+                                    }
+                                },
+                                selectedIndex = selectedDonutIndex
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
 
-            // Monthly bar chart
+            // 3. Monthly bar chart
             item {
                 if (state.monthlySummary.isNotEmpty()) {
                     MonthlyBarChart(summary = state.monthlySummary)
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
 
-            // Budget progress section
+            // 4. Budget progress
             item {
                 if (state.budgets.isNotEmpty()) {
                     BudgetSection(budgets = state.budgets)
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
 
-            // Recurring section
+            // 5. Recurring section
             item {
                 if (state.recurring.isNotEmpty()) {
                     RecurringSection(recurring = state.recurring)
-                    Spacer(modifier = Modifier.height(16.dp))
                 }
             }
 
-            // Category filter chips
+            // 6. Transactions
             item {
-                Text("Filter by Category", color = OnBackground, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-            }
-
-            item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(vertical = 4.dp)
-                ) {
-                    item {
-                        FilterChip(
-                            selected = state.selectedCategoryId == null,
-                            onClick = { vm.selectCategory(null) },
-                            label = { Text("All") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Primary.copy(alpha = 0.2f),
-                                selectedLabelColor = Primary
-                            )
-                        )
-                    }
-                    items(state.categorySpends) { spend ->
-                        FilterChip(
-                            selected = state.selectedCategoryId == spend.category.id,
-                            onClick = { vm.selectCategory(spend.category.id) },
-                            label = { Text("${spend.category.icon ?: ""} ${spend.category.name}") },
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Primary.copy(alpha = 0.2f),
-                                selectedLabelColor = Primary
-                            )
-                        )
-                    }
-                }
-                Spacer(modifier = Modifier.height(12.dp))
-            }
-
-            // Transactions
-            item {
-                Text("Transactions (${filteredByCategory.size})", color = OnBackground, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
-                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "Transactions (${filteredByCategory.size})",
+                    color = OnBackground,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 15.sp
+                )
             }
 
             if (filteredByCategory.isEmpty()) {
                 item {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().padding(32.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
                         Text("No transactions in this period", color = OnSurface)
                     }
                 }
@@ -331,7 +321,6 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
                 ) {
                     TransactionItem(transaction = tx, category = category, showInAed = false)
                 }
-                Spacer(modifier = Modifier.height(4.dp))
             }
         }
     }
