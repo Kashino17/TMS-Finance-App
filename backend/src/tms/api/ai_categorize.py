@@ -9,7 +9,7 @@ from tms.models import Transaction, Category
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
-KIMI_API_URL = "https://api.moonshot.ai/v1/chat/completions"
+KIMI_API_URL = "https://api.kimi.ai/v1/chat/completions"
 
 
 class TestApiKeyRequest(BaseModel):
@@ -24,12 +24,22 @@ class CategorizeRequest(BaseModel):
 @router.post("/test-key")
 async def test_api_key(body: TestApiKeyRequest):
     """Test if the Kimi API key works."""
+    key = body.api_key.strip()
+    key_preview = f"{key[:8]}...{key[-4:]}" if len(key) > 12 else "too_short"
+
+    # Log for debugging
+    with open("/tmp/enbd_kimi_debug.txt", "w") as f:
+        f.write(f"Key length: {len(key)}\n")
+        f.write(f"Key preview: {key_preview}\n")
+        f.write(f"Key starts with: {key[:3]}\n")
+        f.write(f"URL: {KIMI_API_URL}\n")
+
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             resp = await client.post(
                 KIMI_API_URL,
                 headers={
-                    "Authorization": f"Bearer {body.api_key}",
+                    "Authorization": f"Bearer {key}",
                     "Content-Type": "application/json",
                 },
                 json={
@@ -38,10 +48,16 @@ async def test_api_key(body: TestApiKeyRequest):
                     "max_tokens": 5,
                 },
             )
+
+            # Log full response
+            with open("/tmp/enbd_kimi_debug.txt", "a") as f:
+                f.write(f"Status: {resp.status_code}\n")
+                f.write(f"Response: {resp.text[:500]}\n")
+
             if resp.status_code == 200:
                 return {"status": "success", "message": "API key works!"}
             elif resp.status_code == 401:
-                return {"status": "error", "message": "401 Unauthorized — Invalid API key"}
+                return {"status": "error", "message": f"401 Unauthorized — Key: {key_preview} | Response: {resp.text[:100]}"}
             elif resp.status_code == 403:
                 return {"status": "error", "message": "403 Forbidden — API key has no access"}
             elif resp.status_code == 429:
