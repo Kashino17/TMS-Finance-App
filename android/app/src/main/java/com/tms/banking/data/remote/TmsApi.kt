@@ -13,8 +13,10 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.HTTP
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
@@ -39,6 +41,17 @@ interface TmsApi {
         @Path("id") id: Int,
         @Body request: UpdateCategoryRequest
     ): TransactionDto
+
+    @PUT("api/transactions/{id}")
+    suspend fun editTransaction(
+        @Path("id") id: Int,
+        @Body request: Map<String, @JvmSuppressWildcards Any?>
+    ): Response<TransactionDto>
+
+    @HTTP(method = "DELETE", path = "api/transactions/{id}", hasBody = false)
+    suspend fun deleteTransaction(
+        @Path("id") id: Int
+    ): Response<Map<String, String>>
 
     @GET("api/categories")
     suspend fun getCategories(): List<CategoryDto>

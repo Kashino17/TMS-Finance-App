@@ -1,6 +1,8 @@
 package com.tms.banking.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,12 +30,14 @@ import com.tms.banking.ui.theme.OnSurface
 import com.tms.banking.ui.theme.Positive
 import com.tms.banking.ui.theme.SurfaceVariant
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TransactionItem(
     transaction: TransactionEntity,
     category: CategoryEntity?,
     showInAed: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onLongPress: (() -> Unit)? = null
 ) {
     val isNegative = transaction.amount < 0
     val amountColor = if (isNegative) Negative else Positive
@@ -44,10 +48,19 @@ fun TransactionItem(
         try { Color(android.graphics.Color.parseColor(it)) } catch (_: Exception) { CategoryColors.first() }
     } ?: CategoryColors.first()
 
-    Row(
-        modifier = modifier
+    val rowModifier = if (onLongPress != null) {
+        modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .combinedClickable(onClick = {}, onLongClick = onLongPress)
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    } else {
+        modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
+    }
+
+    Row(
+        modifier = rowModifier,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(

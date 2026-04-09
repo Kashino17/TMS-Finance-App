@@ -27,7 +27,8 @@ data class HomeUiState(
     val showInAed: Boolean = false,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val backendConfigured: Boolean = false
+    val backendConfigured: Boolean = false,
+    val searchQuery: String = ""
 )
 
 class HomeViewModel(
@@ -108,6 +109,17 @@ class HomeViewModel(
 
     fun toggleShowInAed() {
         _uiState.value = _uiState.value.copy(showInAed = !_uiState.value.showInAed)
+    }
+
+    fun setSearchQuery(query: String) {
+        _uiState.value = _uiState.value.copy(searchQuery = query)
+    }
+
+    fun updateCategory(txnId: Int, categoryId: Int) {
+        val txRepo = transactionRepo ?: return
+        viewModelScope.launch {
+            txRepo.updateTransactionCategory(txnId, categoryId)
+        }
     }
 
     class Factory(private val container: AppContainer) : ViewModelProvider.Factory {
