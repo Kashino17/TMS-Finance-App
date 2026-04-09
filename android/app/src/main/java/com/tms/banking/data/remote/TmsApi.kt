@@ -75,6 +75,9 @@ interface TmsApi {
     @POST("api/ai/categorize")
     suspend fun aiCategorize(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Map<String, @JvmSuppressWildcards Any>>
 
+    @GET("api/recurring/transactions/{merchant}")
+    suspend fun getRecurringTransactions(@Path("merchant") merchant: String): List<Map<String, @JvmSuppressWildcards Any?>>
+
     @GET("api/loans")
     suspend fun getLoans(): List<Map<String, @JvmSuppressWildcards Any?>>
 

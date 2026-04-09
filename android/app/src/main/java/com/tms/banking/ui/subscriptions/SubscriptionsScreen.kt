@@ -77,14 +77,26 @@ data class SubscriptionData(
 @Composable
 fun SubscriptionsScreen(
     app: TmsApp,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onSubscriptionClick: ((SubscriptionData) -> Unit)? = null
 ) {
     val vm: SubscriptionsViewModel = viewModel(factory = SubscriptionsViewModel.Factory(app.container))
     val state by vm.uiState.collectAsStateWithLifecycle()
     var showBusiness by remember { mutableStateOf(false) }
+    var selectedSub by remember { mutableStateOf<SubscriptionData?>(null) }
 
     val filtered = if (showBusiness) state.business else state.personal
     val totalMonthly = filtered.sumOf { it.avgAmount }
+
+    // If a subscription is selected, show detail screen
+    if (selectedSub != null) {
+        SubscriptionDetailScreen(
+            container = app.container,
+            sub = selectedSub!!,
+            onNavigateBack = { selectedSub = null }
+        )
+        return
+    }
 
     Column(
         modifier = Modifier.fillMaxSize().background(Background)
@@ -170,14 +182,14 @@ fun SubscriptionsScreen(
             }
 
             items(filtered) { sub ->
-                SubscriptionCard(sub)
+                SubscriptionCard(sub, onClick = { selectedSub = sub })
             }
         }
     }
 }
 
 @Composable
-private fun SubscriptionCard(sub: SubscriptionData) {
+private fun SubscriptionCard(sub: SubscriptionData, onClick: () -> Unit = {}) {
     val context = LocalContext.current
     val statusColor = when (sub.status) {
         "active" -> Positive
@@ -195,7 +207,8 @@ private fun SubscriptionCard(sub: SubscriptionData) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Surface)
+        colors = CardDefaults.cardColors(containerColor = Surface),
+        onClick = onClick
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
