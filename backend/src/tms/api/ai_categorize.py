@@ -112,14 +112,16 @@ Categorization rules:
 - Pharmacy, medical, clinic, hospital, Apotheke → Gesundheit
 - Card Payment Received (positive amount from card) → Transfers
 - Cash Advance (withdrawing cash from credit card) → Bankgebühren
-- Facebook/Meta ads, Google Ads → Shopping
-- Hosting (Hostinger, Render, Vercel, Supabase), domain, SaaS tools → Abos
+- Facebook/Meta ads, Google Ads, Shopify fees, business tools (Wafeq, Omnisend) → Business
+- Hosting (Hostinger, Render, Vercel, Supabase), domain → Business
+- Personal subscriptions (Netflix, Claude.ai, Spotify, Google One, Crunchyroll, Capcut, Noon One, Careem Plus) → Abos
 - If genuinely unclear → Sonstiges
 
 Subscription detection:
 - A transaction is an "Abo" (subscription) ONLY if the same merchant charges a similar amount monthly (e.g. Netflix, Claude.ai, Google One)
 - Buying a train ticket, fuel, groceries, or food delivery is NOT an Abo even if frequent — those are individual purchases
-- SaaS tools with monthly billing (Hostinger, Render, Supabase, Vercel) ARE Abos
+- Business SaaS tools (Hostinger, Render, Supabase, Vercel, Shopify, Wafeq) are Business expenses, NOT Abos
+- Personal subscriptions (Netflix, Spotify, Claude.ai, Google One) ARE Abos
 
 Respond ONLY with JSON array: [{{"id": 123, "category": "CategoryName"}}]
 No explanations, just the JSON array."""

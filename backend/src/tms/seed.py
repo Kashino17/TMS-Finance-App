@@ -17,6 +17,7 @@ DEFAULT_CATEGORIES = [
     ("Auto", "🚙", "#1565c0"),
     ("Reisen", "✈️", "#00897b"),
     ("Bildung", "📚", "#6a1b9a"),
+    ("Business", "💼", "#37474f"),
     ("Spenden", "🤝", "#c62828"),
     ("Sonstiges", "📦", "#9e9e9e"),
 ]
