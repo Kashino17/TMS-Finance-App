@@ -169,7 +169,7 @@ class ENBDApiClient:
 
             if current_count == prev_count:
                 stall_count += 1
-                if stall_count >= 5:
+                if stall_count >= 8:
                     # Try harder
                     for _ in range(15):
                         page.mouse.wheel(0, 1500)
@@ -253,24 +253,46 @@ class ENBDApiClient:
     def _parse_transaction(self, txn: dict) -> RawTransaction | None:
         try:
             amount = float(txn.get("amount", txn.get("transactionAmount", 0)))
-            currency = txn.get("currency", txn.get("transactionCurrency", "AED"))
+            currency = txn.get("currencyCode", txn.get("currency", "AED"))
 
-            date_str = txn.get("date", txn.get("transactionDate", txn.get("postingDate", "")))
-            if isinstance(date_str, (int, float)):
-                txn_date = datetime.fromtimestamp(date_str / 1000).date()
-            elif date_str:
-                txn_date = date.fromisoformat(str(date_str)[:10])
+            # Date is timestamp in milliseconds
+            date_val = txn.get("date", txn.get("transactionDate", txn.get("postingDate", "")))
+            if isinstance(date_val, (int, float)) and date_val > 1000000000:
+                txn_date = datetime.fromtimestamp(date_val / 1000).date()
+            elif isinstance(date_val, str) and date_val:
+                txn_date = date.fromisoformat(str(date_val)[:10])
             else:
                 return None
 
-            merchant = txn.get("merchant", txn.get("merchantName", txn.get("description", txn.get("narrative", ""))))
-            if isinstance(merchant, dict):
-                merchant = merchant.get("name", str(merchant))
-            description = txn.get("description", txn.get("narrative", txn.get("remarks", "")))
+            # Merchant name from purpose.extendedNarrations[0].title
+            merchant = None
+            purpose = txn.get("purpose", {})
+            if isinstance(purpose, dict):
+                narrations = purpose.get("extendedNarrations", [])
+                if narrations and isinstance(narrations, list):
+                    for n in narrations:
+                        if n.get("languange") == "en" or not merchant:
+                            merchant = n.get("title", "")
+            if not merchant:
+                merchant = txn.get("merchant", txn.get("merchantName", txn.get("description", "")))
+                if isinstance(merchant, dict):
+                    merchant = merchant.get("name", str(merchant))
 
-            txn_type = str(txn.get("type", txn.get("transactionType", ""))).lower()
-            if txn_type in ("debit", "dr") and amount > 0:
+            # Description from purpose subtitle
+            description = ""
+            if isinstance(purpose, dict):
+                narrations = purpose.get("extendedNarrations", [])
+                if narrations:
+                    description = narrations[0].get("subTitle", "")
+            if not description:
+                description = txn.get("description", txn.get("narrative", txn.get("remarks", "")))
+
+            # creditDebitIndicator: "DR" = debit (negative), "CR" = credit (positive)
+            indicator = str(txn.get("creditDebitIndicator", txn.get("type", ""))).upper()
+            if indicator == "DR" and amount > 0:
                 amount = -amount
+            elif indicator == "CR" and amount < 0:
+                amount = abs(amount)
 
             external_id = str(txn.get("id", txn.get("transactionId", txn.get("referenceNumber", f"{txn_date}_{abs(amount)}"))))
 
