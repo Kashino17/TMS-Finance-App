@@ -11,6 +11,7 @@ from tms.api.categories import router as categories_router
 from tms.api.notifications import router as notifications_router
 from tms.api.sync import router as sync_router
 from tms.api.ai_categorize import router as ai_router
+from tms.api.loans import router as loans_router
 
 scheduler = BackgroundScheduler()
 
@@ -84,6 +85,7 @@ app.include_router(categories_router)
 app.include_router(notifications_router)
 app.include_router(sync_router)
 app.include_router(ai_router)
+app.include_router(loans_router)
 
 
 @app.get("/health")

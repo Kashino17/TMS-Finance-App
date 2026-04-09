@@ -61,6 +61,15 @@ interface TmsApi {
     @POST("api/ai/categorize")
     suspend fun aiCategorize(@Body body: Map<String, @JvmSuppressWildcards Any>): Response<Map<String, @JvmSuppressWildcards Any>>
 
+    @GET("api/loans")
+    suspend fun getLoans(): List<Map<String, @JvmSuppressWildcards Any?>>
+
+    @POST("api/loans")
+    suspend fun createLoan(@Body loan: Map<String, @JvmSuppressWildcards Any>): Response<Map<String, @JvmSuppressWildcards Any>>
+
+    @retrofit2.http.DELETE("api/loans/{id}")
+    suspend fun deleteLoan(@Path("id") id: Int): Response<Map<String, String>>
+
     @POST("api/notifications")
     suspend fun postNotification(@Body notification: NotificationDto): Response<Map<String, String>>
 

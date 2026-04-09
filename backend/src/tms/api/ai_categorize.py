@@ -96,22 +96,30 @@ async def categorize_transactions(body: CategorizeRequest, db: Session = Depends
 Transactions:
 {chr(10).join(txn_lines)}
 
-Rules:
-- Cash Advance Fee, VAT Fee, Card fees → Bankgebühren
-- Uber, Careem, Salik, RTA, fuel stations, Aral → Transport
-- Rent-a-Car, Udrive → Auto
-- Rewe, Aldi, Flink, Spinneys, Carrefour, supermarkets, grocery → Lebensmittel
-- Restaurants, cafes, food delivery (Noon Food, Uber Eats, Careem Food) → Restaurants
-- Netflix, Spotify, Claude.ai, OpenAI, Crunchyroll, subscriptions → Abos
-- Hotels, flights, Trip.com, Airalo, travel insurance → Reisen
-- Amazon, Noon.com, Shopify purchases → Shopping
-- Transfers between own accounts, payments to people → Transfers
-- Salary, income credits → Einkommen
-- DEWA, electricity, telecom, E& → Nebenkosten
-- Rent payments → Miete
-- Pharmacy, medical → Gesundheit
-- Card Payment Received (positive amount) → Transfers
-- If unclear → Sonstiges
+Categorization rules:
+- Cash Advance Fee, VAT Fee, Card fees, bank charges → Bankgebühren
+- Uber rides, Careem rides, Salik tolls, RTA, fuel/petrol stations (Aral, Shell, Esso) → Transport
+- Rent-a-Car, Udrive, car rental → Auto
+- Rewe, Aldi, Flink, Spinneys, Carrefour, Lulu, supermarkets, grocery stores → Lebensmittel
+- Restaurants, cafes, food delivery (Noon Food, Uber Eats, Careem Food), kebab, fast food → Restaurants
+- Monthly subscriptions: Netflix, Spotify, Claude.ai, OpenAI, Crunchyroll, Google One, Capcut, Noon One, Careem Plus → Abos
+- Hotels, flights, Trip.com, Airalo (eSIM for travel), travel insurance, Deutsche Bahn tickets → Reisen
+- Amazon, Noon.com, Shopify, online shopping, electronics stores (Media Markt) → Shopping
+- Transfers between own accounts, payments to people (personal names) → Transfers
+- Salary, income credits, Account Credited → Einkommen
+- DEWA (electricity/water), du/Etisalat/E& (telecom) → Nebenkosten
+- Rent/lease payments to landlords, real estate companies → Miete
+- Pharmacy, medical, clinic, hospital, Apotheke → Gesundheit
+- Card Payment Received (positive amount from card) → Transfers
+- Cash Advance (withdrawing cash from credit card) → Bankgebühren
+- Facebook/Meta ads, Google Ads → Shopping
+- Hosting (Hostinger, Render, Vercel, Supabase), domain, SaaS tools → Abos
+- If genuinely unclear → Sonstiges
+
+Subscription detection:
+- A transaction is an "Abo" (subscription) ONLY if the same merchant charges a similar amount monthly (e.g. Netflix, Claude.ai, Google One)
+- Buying a train ticket, fuel, groceries, or food delivery is NOT an Abo even if frequent — those are individual purchases
+- SaaS tools with monthly billing (Hostinger, Render, Supabase, Vercel) ARE Abos
 
 Respond ONLY with JSON array: [{{"id": 123, "category": "CategoryName"}}]
 No explanations, just the JSON array."""

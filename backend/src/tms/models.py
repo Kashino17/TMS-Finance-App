@@ -86,3 +86,24 @@ class SyncLog(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     account: Mapped["Account"] = relationship(back_populates="sync_logs")
+
+
+class Loan(Base):
+    __tablename__ = "loans"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    type: Mapped[str] = mapped_column(String(50))  # personal_loan / credit_card_loan / installment
+    total_amount: Mapped[float] = mapped_column(Float)
+    remaining_amount: Mapped[float] = mapped_column(Float)
+    monthly_payment: Mapped[float] = mapped_column(Float)
+    interest_rate: Mapped[float | None] = mapped_column(Float, nullable=True)
+    currency: Mapped[str] = mapped_column(String(3), default="AED")
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_day: Mapped[int | None] = mapped_column(Integer, nullable=True)  # Day of month
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )

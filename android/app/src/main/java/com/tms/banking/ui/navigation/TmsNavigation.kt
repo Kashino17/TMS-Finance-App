@@ -5,6 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
@@ -29,6 +30,7 @@ import com.tms.banking.ui.account.AccountDetailScreen
 import com.tms.banking.ui.add.AddTransactionScreen
 import com.tms.banking.ui.categories.CategoriesScreen
 import com.tms.banking.ui.home.HomeScreen
+import com.tms.banking.ui.loans.LoansScreen
 import com.tms.banking.ui.settings.SettingsScreen
 import com.tms.banking.ui.theme.Background
 import com.tms.banking.ui.theme.OnSurface
@@ -38,6 +40,7 @@ import com.tms.banking.ui.theme.Surface
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Home : Screen("home", "Home", Icons.Filled.Home)
     object Categories : Screen("categories", "Categories", Icons.Filled.PieChart)
+    object Loans : Screen("loans", "Loans", Icons.Filled.AccountBalance)
     object Add : Screen("add", "Add", Icons.Filled.Add)
     object Settings : Screen("settings", "Settings", Icons.Filled.Settings)
     object AccountDetail : Screen("account/{accountId}", "Account", Icons.Filled.Home) {
@@ -48,6 +51,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 val bottomNavItems = listOf(
     Screen.Home,
     Screen.Categories,
+    Screen.Loans,
     Screen.Add,
     Screen.Settings
 )
@@ -113,6 +117,9 @@ fun TmsNavigation(app: TmsApp) {
             }
             composable(Screen.Categories.route) {
                 CategoriesScreen(app = app)
+            }
+            composable(Screen.Loans.route) {
+                LoansScreen(app = app)
             }
             composable(Screen.Add.route) {
                 AddTransactionScreen(
