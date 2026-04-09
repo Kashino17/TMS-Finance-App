@@ -47,12 +47,13 @@ def sync_enbd(body: ENBDSyncRequest, background_tasks: BackgroundTasks):
     if _sync_status["enbd"] in ("waiting_smartpass", "syncing"):
         return {"status": "already_running", "message": "ENBD sync already in progress"}
 
+    mode = "Full Backlog" if body.full_sync else "Quick Sync"
     _sync_status["enbd"] = "waiting_smartpass"
-    _sync_message["enbd"] = "Logging in... Approve Smart Pass on your phone!"
-    background_tasks.add_task(_run_enbd_sync, body.username, body.password)
+    _sync_message["enbd"] = f"{mode}: Logging in... Approve Smart Pass on your phone!"
+    background_tasks.add_task(_run_enbd_sync, body.username, body.password, body.full_sync)
     return {
         "status": "started",
-        "message": "Logging into Emirates NBD... Open your ENBD X app and approve the Smart Pass notification!",
+        "message": f"{mode}: Logging into Emirates NBD... Approve Smart Pass!",
     }
 
 
@@ -61,7 +62,7 @@ def enbd_sync_status():
     return {"status": _sync_status["enbd"], "message": _sync_message["enbd"]}
 
 
-def _run_enbd_sync(username: str, password: str):
+def _run_enbd_sync(username: str, password: str, full_sync: bool = False):
     from tms.connectors.enbd_scraper import ENBDScraper
 
     try:
@@ -70,7 +71,7 @@ def _run_enbd_sync(username: str, password: str):
         _sync_status["enbd"] = "waiting_smartpass"
         _sync_message["enbd"] = "Waiting for Smart Pass approval..."
 
-        accounts, transactions = scraper.sync()
+        accounts, transactions = scraper.sync(full_sync=full_sync)
 
         _sync_status["enbd"] = "syncing"
         _sync_message["enbd"] = f"Got {len(accounts)} accounts, {len(transactions)} transactions. Saving..."

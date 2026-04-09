@@ -14,7 +14,7 @@ class ENBDScraper:
         self.username = username
         self.password = password
 
-    def sync(self) -> tuple[list[AccountBalance], list[RawTransaction]]:
+    def sync(self, full_sync: bool = False) -> tuple[list[AccountBalance], list[RawTransaction]]:
         """Login, wait for Smart Pass approval, scrape accounts + transactions."""
         with sync_playwright() as p:
             browser = p.chromium.launch(
@@ -44,7 +44,7 @@ class ENBDScraper:
                     f.write(text)
 
                 accounts = self._parse_accounts(text)
-                transactions = self._parse_transactions(text, page)
+                transactions = self._parse_transactions(text, page, full_sync=full_sync)
 
                 return accounts, transactions
             finally:
@@ -134,7 +134,7 @@ class ENBDScraper:
 
         return accounts
 
-    def _parse_transactions(self, text: str, page: Page) -> list[RawTransaction]:
+    def _parse_transactions(self, text: str, page: Page, full_sync: bool = False) -> list[RawTransaction]:
         """Parse transactions from the RECENT TRANSACTIONS section.
 
         ENBD format on dashboard:
@@ -153,8 +153,13 @@ class ENBDScraper:
         except Exception:
             pass
 
-        # Infinite scroll until all transactions are loaded
-        text = self._scroll_to_load_all(page)
+        if full_sync:
+            # Backlog: scroll through ALL transactions (slow but complete)
+            text = self._scroll_to_load_all(page)
+        else:
+            # Quick sync: just read what's already visible (recent transactions)
+            page.wait_for_timeout(2000)
+            text = page.inner_text("body")
 
         with open("/tmp/enbd_after_scrape_text.txt", "w") as f:
             f.write(text)

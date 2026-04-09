@@ -113,7 +113,7 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
         )
     }
 
-    fun syncEnbd() {
+    fun syncEnbd(fullSync: Boolean = false) {
         val url = _uiState.value.backendUrl
         if (url.isBlank()) {
             _uiState.value = _uiState.value.copy(enbdSyncMessage = "Backend not configured")
@@ -124,16 +124,18 @@ class SettingsViewModel(private val container: AppContainer) : ViewModel() {
             return
         }
 
+        val mode = if (fullSync) "Full Backlog" else "Quick Sync"
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 enbdSyncStatus = "starting",
-                enbdSyncMessage = "Connecting to Emirates NBD...",
+                enbdSyncMessage = "$mode: Connecting to Emirates NBD...",
             )
             try {
                 val api = container.buildApi(url)
-                val creds = mapOf(
+                val creds = mapOf<String, Any>(
                     "username" to container.credentialStore.enbdUsername,
                     "password" to container.credentialStore.enbdPassword,
+                    "full_sync" to fullSync,
                 )
                 val response = api.syncEnbd(creds)
                 if (response.isSuccessful) {

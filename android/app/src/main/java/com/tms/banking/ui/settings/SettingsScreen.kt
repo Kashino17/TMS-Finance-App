@@ -231,16 +231,15 @@ fun SettingsScreen(app: TmsApp) {
                         )
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
                             onClick = { vm.saveEnbdCredentials() },
-                            modifier = Modifier.weight(1f),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Outline)
                         ) {
-                            Text("Save", color = OnBackground)
+                            Text("Save", color = OnBackground, fontSize = 12.sp)
                         }
                         Button(
-                            onClick = { vm.syncEnbd() },
+                            onClick = { vm.syncEnbd(fullSync = false) },
                             modifier = Modifier.weight(1f),
                             colors = ButtonDefaults.buttonColors(containerColor = Primary),
                             enabled = state.enbdSyncStatus != "waiting_smartpass" && state.enbdSyncStatus != "syncing"
@@ -252,8 +251,15 @@ fun SettingsScreen(app: TmsApp) {
                                     strokeWidth = 2.dp
                                 )
                             } else {
-                                Text("Sync ENBD", color = OnBackground)
+                                Text("Quick Sync", color = OnBackground, fontSize = 12.sp)
                             }
+                        }
+                        OutlinedButton(
+                            onClick = { vm.syncEnbd(fullSync = true) },
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Primary),
+                            enabled = state.enbdSyncStatus != "waiting_smartpass" && state.enbdSyncStatus != "syncing"
+                        ) {
+                            Text("Full Backlog", color = Primary, fontSize = 12.sp)
                         }
                     }
                     if (state.enbdSyncMessage.isNotBlank()) {

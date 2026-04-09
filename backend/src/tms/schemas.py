@@ -63,3 +63,4 @@ class NotificationIn(BaseModel):
 class ENBDSyncRequest(BaseModel):
     username: str
     password: str
+    full_sync: bool = False  # True = backlog (scroll all), False = quick (recent only)

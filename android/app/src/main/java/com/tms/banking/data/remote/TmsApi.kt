@@ -50,7 +50,7 @@ interface TmsApi {
     suspend fun triggerSync(): Response<Map<String, String>>
 
     @POST("api/sync/enbd")
-    suspend fun syncEnbd(@Body credentials: Map<String, String>): Response<Map<String, String>>
+    suspend fun syncEnbd(@Body credentials: Map<String, @JvmSuppressWildcards Any>): Response<Map<String, String>>
 
     @GET("api/sync/enbd/status")
     suspend fun getEnbdSyncStatus(): Response<Map<String, String>>
