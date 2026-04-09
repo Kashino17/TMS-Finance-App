@@ -178,12 +178,10 @@ class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
         val current = _uiState.value.selectedCategoryIds
         val updated = if (categoryId in current) current - categoryId else current + categoryId
         _uiState.value = _uiState.value.copy(selectedCategoryIds = updated)
-        observeData()
     }
 
     fun clearCategoryFilter() {
         _uiState.value = _uiState.value.copy(selectedCategoryIds = emptySet())
-        observeData()
     }
 
     class Factory(private val container: AppContainer) : ViewModelProvider.Factory {
