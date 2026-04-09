@@ -7,7 +7,7 @@ def test_seed_creates_all_categories(db):
     categories = db.query(Category).all()
     top_level = [c for c in categories if c.parent_id is None]
 
-    assert len(top_level) == 12
+    assert len(top_level) == 18
     names = {c.name for c in top_level}
     assert "Einkommen" in names
     assert "Lebensmittel" in names
@@ -20,4 +20,4 @@ def test_seed_is_idempotent(db):
     seed_categories(db)
     categories = db.query(Category).all()
     top_level = [c for c in categories if c.parent_id is None]
-    assert len(top_level) == 12
+    assert len(top_level) == 18

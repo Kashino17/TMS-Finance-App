@@ -32,7 +32,7 @@ def test_list_categories():
     resp = client.get("/api/categories")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 12
+    assert len(data) == 18
     names = {c["name"] for c in data}
     assert "Einkommen" in names
     assert "Sonstiges" in names

@@ -33,15 +33,28 @@ MOCK_TRANSACTIONS_RESPONSE = {
     ]
 }
 
+MOCK_TOKEN_RESPONSE = {
+    "access_token": "mock_access_token_abc123",
+    "expires_in": 3600,
+}
+
 
 @patch("tms.connectors.lean.httpx")
 def test_fetch_accounts(mock_httpx):
-    resp = MagicMock()
-    resp.json.return_value = MOCK_ACCOUNTS_RESPONSE
-    resp.raise_for_status = MagicMock()
-    mock_httpx.get.return_value = resp
+    # OAuth token POST response
+    token_resp = MagicMock()
+    token_resp.json.return_value = MOCK_TOKEN_RESPONSE
+    token_resp.raise_for_status = MagicMock()
 
-    connector = LeanConnector(app_token="test_token", customer_id="cust_123")
+    # Accounts GET response
+    accounts_resp = MagicMock()
+    accounts_resp.json.return_value = MOCK_ACCOUNTS_RESPONSE
+    accounts_resp.raise_for_status = MagicMock()
+
+    mock_httpx.post.return_value = token_resp
+    mock_httpx.get.return_value = accounts_resp
+
+    connector = LeanConnector(app_id="test_app", client_secret="test_secret", customer_id="cust_123")
     accounts = connector.fetch_accounts()
 
     assert len(accounts) == 1
@@ -52,12 +65,20 @@ def test_fetch_accounts(mock_httpx):
 
 @patch("tms.connectors.lean.httpx")
 def test_fetch_transactions(mock_httpx):
-    resp = MagicMock()
-    resp.json.return_value = MOCK_TRANSACTIONS_RESPONSE
-    resp.raise_for_status = MagicMock()
-    mock_httpx.get.return_value = resp
+    # OAuth token POST response
+    token_resp = MagicMock()
+    token_resp.json.return_value = MOCK_TOKEN_RESPONSE
+    token_resp.raise_for_status = MagicMock()
 
-    connector = LeanConnector(app_token="test_token", customer_id="cust_123")
+    # Transactions GET response
+    txns_resp = MagicMock()
+    txns_resp.json.return_value = MOCK_TRANSACTIONS_RESPONSE
+    txns_resp.raise_for_status = MagicMock()
+
+    mock_httpx.post.return_value = token_resp
+    mock_httpx.get.return_value = txns_resp
+
+    connector = LeanConnector(app_id="test_app", client_secret="test_secret", customer_id="cust_123")
     txns = connector.fetch_transactions("acc_123", since=date(2026, 4, 1))
 
     assert len(txns) == 2

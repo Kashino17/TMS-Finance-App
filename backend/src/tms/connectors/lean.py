@@ -1,5 +1,5 @@
 import json
-from datetime import date, datetime, UTC
+from datetime import date, datetime, timedelta, UTC
 import httpx
 from tms.connectors.base import RawTransaction, AccountBalance
 
@@ -39,9 +39,8 @@ class LeanConnector:
         resp.raise_for_status()
         token_data = resp.json()
         self._access_token = token_data["access_token"]
-        self._token_expires_at = now.replace(
-            second=now.second + token_data.get("expires_in", 3600) - 60
-        )
+        expires_in = token_data.get("expires_in", 3600)
+        self._token_expires_at = now + timedelta(seconds=expires_in - 60)
         return self._access_token
 
     def _headers(self) -> dict:
