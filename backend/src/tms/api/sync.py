@@ -63,15 +63,15 @@ def enbd_sync_status():
 
 
 def _run_enbd_sync(username: str, password: str, full_sync: bool = False):
-    from tms.connectors.enbd_scraper import ENBDScraper
+    from tms.connectors.enbd_api import ENBDApiClient
 
     try:
-        scraper = ENBDScraper(username, password)
+        client = ENBDApiClient(username, password)
 
         _sync_status["enbd"] = "waiting_smartpass"
         _sync_message["enbd"] = "Waiting for Smart Pass approval..."
 
-        accounts, transactions = scraper.sync(full_sync=full_sync)
+        accounts, transactions = client.sync(full_sync=full_sync)
 
         _sync_status["enbd"] = "syncing"
         _sync_message["enbd"] = f"Got {len(accounts)} accounts, {len(transactions)} transactions. Saving..."
