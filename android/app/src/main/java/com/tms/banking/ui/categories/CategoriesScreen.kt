@@ -152,9 +152,14 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
     }
 
     val totalSpend = donutSlices.sumOf { it.value }
-    val filteredSpend = remember(donutSlices, selectedDonutIndices) {
-        if (selectedDonutIndices.isEmpty()) totalSpend
-        else donutSlices.filterIndexed { i, _ -> i in selectedDonutIndices }.sumOf { it.value }
+    val filteredSpend = remember(donutSlices, state.selectedCategoryIds, state.categories) {
+        if (state.selectedCategoryIds.isEmpty()) totalSpend
+        else {
+            val selectedNames = state.selectedCategoryIds.mapNotNull { id ->
+                state.categories.find { it.id == id }?.name
+            }.toSet()
+            donutSlices.filter { it.label in selectedNames }.sumOf { it.value }
+        }
     }
 
     if (showDatePicker) {
