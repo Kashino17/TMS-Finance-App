@@ -313,7 +313,7 @@ class ENBDScraper:
         container, not the window. We simulate real mouse wheel scrolling in the center
         of the page, exactly like a user would do manually.
         """
-        max_scrolls = 10000  # Enough for years of transactions
+        max_scrolls = 30000
         prev_line_count = 0
         stall_count = 0
 
