@@ -85,10 +85,16 @@ fun DonutChart(
                 var startAngle = -90f
                 val gap = 2f
 
-                slices.forEach { slice ->
+                val hasSelection = selectedIndices.isNotEmpty()
+                slices.forEachIndexed { idx, slice ->
                     val sweep = ((slice.value.toFloat() / total.toFloat()) * 360f * animatedProgress - gap).coerceAtLeast(0f)
+                    val arcColor = if (hasSelection && idx !in selectedIndices) {
+                        slice.color.copy(alpha = 0.15f) // Gray out non-selected
+                    } else {
+                        slice.color
+                    }
                     drawArc(
-                        color = slice.color,
+                        color = arcColor,
                         startAngle = startAngle,
                         sweepAngle = sweep,
                         useCenter = false,
@@ -117,8 +123,10 @@ fun DonutChart(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        val hasAnySelection = selectedIndices.isNotEmpty()
         slices.forEachIndexed { index, slice ->
             val isSelected = index in selectedIndices
+            val isDimmed = hasAnySelection && !isSelected
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -142,27 +150,29 @@ fun DonutChart(
                         ))
                 ) {
                     Canvas(modifier = Modifier.size(10.dp)) {
-                        drawCircle(color = slice.color)
+                        drawCircle(color = if (isDimmed) slice.color.copy(alpha = 0.2f) else slice.color)
                     }
                 }
                 Spacer(modifier = Modifier.width(8.dp))
+                val textColor = if (isDimmed) OnSurface.copy(alpha = 0.3f) else OnSurface
+                val valueColor = if (isDimmed) OnBackground.copy(alpha = 0.3f) else OnBackground
                 Text(
                     text = slice.label,
-                    color = OnSurface,
+                    color = textColor,
                     fontSize = 12.sp,
                     modifier = Modifier.weight(1f)
                 )
                 val pct = if (total > 0) (slice.value / total * 100).toInt() else 0
                 Text(
                     text = "$pct%",
-                    color = OnBackground,
+                    color = valueColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
                     text = formatAmountShort(slice.value),
-                    color = OnBackground,
+                    color = valueColor,
                     fontSize = 12.sp
                 )
             }
