@@ -110,16 +110,9 @@ class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
                 }.filter { it.totalAed > 0 }
                     .sortedByDescending { it.totalAed }
 
-                val ids = _uiState.value.selectedCategoryIds
-                val selectedTxs = if (ids.isNotEmpty()) {
-                    transactions.filter { it.categoryId in ids }
-                } else {
-                    transactions
-                }
-
                 _uiState.value = _uiState.value.copy(
                     categorySpends = spends,
-                    transactions = selectedTxs,
+                    transactions = transactions,  // Always ALL transactions — filtering happens in UI
                     categories = categories
                 )
             }
