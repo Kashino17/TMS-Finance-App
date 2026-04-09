@@ -61,17 +61,27 @@ class SyncEngine:
     ) -> int:
         new_count = 0
         for raw in raw_txns:
-            # Dedup: same amount + date + merchant
-            exists = (
-                db.query(Transaction)
-                .filter(
-                    Transaction.account_id == account.id,
-                    Transaction.amount == raw.amount,
-                    Transaction.date == raw.date,
-                    Transaction.merchant_name == raw.merchant_name,
+            # Dedup: check external_id first (if available), fallback to amount+date+merchant
+            if raw.external_id:
+                exists = (
+                    db.query(Transaction)
+                    .filter(
+                        Transaction.account_id == account.id,
+                        Transaction.external_id == raw.external_id,
+                    )
+                    .first()
                 )
-                .first()
-            )
+            else:
+                exists = (
+                    db.query(Transaction)
+                    .filter(
+                        Transaction.account_id == account.id,
+                        Transaction.amount == raw.amount,
+                        Transaction.date == raw.date,
+                        Transaction.merchant_name == raw.merchant_name,
+                    )
+                    .first()
+                )
             if exists:
                 continue
 
@@ -86,6 +96,7 @@ class SyncEngine:
 
             db.add(Transaction(
                 account_id=account.id,
+                external_id=raw.external_id if raw.external_id else None,
                 amount=raw.amount,
                 currency=raw.currency,
                 amount_aed=amount_aed,

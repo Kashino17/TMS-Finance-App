@@ -1,6 +1,9 @@
-from datetime import date
+import logging
+from datetime import date, datetime, UTC
 from sqlalchemy.orm import Session
 from tms.models import ExchangeRate
+
+logger = logging.getLogger(__name__)
 
 
 class CurrencyService:
@@ -53,3 +56,24 @@ class CurrencyService:
                         rate=rate, date=on_date,
                     ))
             db.commit()
+
+    def fetch_and_store_rates(self) -> None:
+        """Fetch current exchange rates from exchangerate.host and persist them."""
+        import urllib.request
+        import json
+
+        currencies = ["AED", "EUR", "USD", "HKD", "GBP"]
+        today = datetime.now(UTC).date()
+
+        try:
+            url = f"https://api.exchangerate.host/latest?base=AED&symbols={','.join(currencies)}"
+            with urllib.request.urlopen(url, timeout=10) as response:
+                data = json.loads(response.read().decode())
+
+            if data.get("success") and data.get("rates"):
+                self.store_rates(data["rates"], base="AED", on_date=today)
+                logger.info("Exchange rates updated for %s", today)
+            else:
+                logger.warning("exchangerate.host returned unexpected response: %s", data)
+        except Exception as exc:
+            logger.error("Failed to fetch exchange rates: %s", exc)

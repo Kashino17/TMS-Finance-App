@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from tms.db import get_db
 from tms.models import Transaction
-from tms.schemas import TransactionOut, UpdateTransactionCategory
+from tms.schemas import TransactionOut, UpdateTransactionCategory, TransactionUpdate
+from tms.services.categorizer import Categorizer
 
 router = APIRouter(prefix="/api/transactions", tags=["transactions"])
 
@@ -65,7 +66,67 @@ def update_transaction_category(
     txn = db.get(Transaction, txn_id)
     if not txn:
         raise HTTPException(404, "Transaction not found")
+    old_category_id = txn.category_id
     txn.category_id = body.category_id
     db.commit()
     db.refresh(txn)
+
+    # Learn: if merchant is known and category changed, persist the mapping
+    if txn.merchant_name and old_category_id != body.category_id:
+        db_engine = db.get_bind()
+        categorizer = Categorizer(db_engine)
+        categorizer.learn(txn.merchant_name, body.category_id)
+
     return txn
+
+
+@router.put("/{txn_id}", response_model=TransactionOut)
+def update_transaction(
+    txn_id: int,
+    body: TransactionUpdate,
+    db: Session = Depends(get_db),
+):
+    txn = db.get(Transaction, txn_id)
+    if not txn:
+        raise HTTPException(404, "Transaction not found")
+
+    old_category_id = txn.category_id
+
+    if body.merchant_name is not None:
+        txn.merchant_name = body.merchant_name
+    if body.description is not None:
+        txn.description = body.description
+    if body.amount is not None:
+        txn.amount = body.amount
+        # Recalculate amount_aed if currency hasn't changed
+        txn.amount_aed = body.amount  # Simple passthrough; currency service not called here
+    if body.date is not None:
+        txn.date = body.date
+    if body.category_id is not None:
+        txn.category_id = body.category_id
+    if body.notes is not None:
+        txn.notes = body.notes
+
+    db.commit()
+    db.refresh(txn)
+
+    # Learn the new category mapping if category was changed and merchant is known
+    if body.category_id is not None and txn.merchant_name and old_category_id != body.category_id:
+        db_engine = db.get_bind()
+        categorizer = Categorizer(db_engine)
+        categorizer.learn(txn.merchant_name, body.category_id)
+
+    return txn
+
+
+@router.delete("/{txn_id}")
+def delete_transaction(
+    txn_id: int,
+    db: Session = Depends(get_db),
+):
+    txn = db.get(Transaction, txn_id)
+    if not txn:
+        raise HTTPException(404, "Transaction not found")
+    db.delete(txn)
+    db.commit()
+    return {"deleted": True, "id": txn_id}

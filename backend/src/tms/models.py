@@ -33,6 +33,7 @@ class Transaction(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     account_id: Mapped[int] = mapped_column(ForeignKey("accounts.id"))
+    external_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
     amount: Mapped[float] = mapped_column(Float)
     currency: Mapped[str] = mapped_column(String(3))
     amount_aed: Mapped[float] = mapped_column(Float)
@@ -42,6 +43,7 @@ class Transaction(Base):
     category_id: Mapped[int | None] = mapped_column(
         ForeignKey("categories.id"), nullable=True
     )
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(20))  # lean/revolut/fints/notification/manual
     raw_data: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
@@ -107,3 +109,12 @@ class Loan(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(UTC)
     )
+
+
+class MerchantCategoryMapping(Base):
+    __tablename__ = "merchant_category_mappings"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    merchant_name: Mapped[str] = mapped_column(String(300), unique=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))

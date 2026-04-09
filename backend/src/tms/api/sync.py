@@ -36,7 +36,9 @@ def sync_status(db: Session = Depends(get_db)):
 
 
 @router.post("/trigger")
-def trigger_sync():
+def trigger_sync(background_tasks: BackgroundTasks):
+    from tms.main import scheduled_sync
+    background_tasks.add_task(scheduled_sync)
     return {"status": "triggered"}
 
 
@@ -114,19 +116,26 @@ def _run_enbd_sync(username: str, password: str, full_sync: bool = False):
             enbd_account = db.query(Account).filter_by(bank="emirates_nbd").first()
             if enbd_account:
                 for raw_txn in transactions:
-                    # Dedup
-                    exists = db.query(Transaction).filter(
-                        Transaction.account_id == enbd_account.id,
-                        Transaction.amount == raw_txn.amount,
-                        Transaction.date == raw_txn.date,
-                        Transaction.merchant_name == raw_txn.merchant_name,
-                    ).first()
+                    # Dedup: check external_id first, fallback to amount+date+merchant
+                    if raw_txn.external_id:
+                        exists = db.query(Transaction).filter(
+                            Transaction.account_id == enbd_account.id,
+                            Transaction.external_id == raw_txn.external_id,
+                        ).first()
+                    else:
+                        exists = db.query(Transaction).filter(
+                            Transaction.account_id == enbd_account.id,
+                            Transaction.amount == raw_txn.amount,
+                            Transaction.date == raw_txn.date,
+                            Transaction.merchant_name == raw_txn.merchant_name,
+                        ).first()
                     if exists:
                         continue
 
                     category_id = categorizer.categorize(raw_txn.merchant_name, raw_txn.description)
                     db.add(Transaction(
                         account_id=enbd_account.id,
+                        external_id=raw_txn.external_id if raw_txn.external_id else None,
                         amount=raw_txn.amount,
                         currency=raw_txn.currency,
                         amount_aed=raw_txn.amount,  # ENBD is AED

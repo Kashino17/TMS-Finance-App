@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Session
-from tms.models import Category
+from tms.models import Category, MerchantCategoryMapping
 
 MERCHANT_MAP = {
     "carrefour": "Lebensmittel",
@@ -45,11 +45,18 @@ class Categorizer:
         self._learned: dict[str, int] = {}
         self._category_cache: dict[str, int] = {}
         self._load_category_ids()
+        self._load_learned_mappings()
 
     def _load_category_ids(self):
         with Session(self.engine) as db:
             for cat in db.query(Category).filter(Category.parent_id.is_(None)).all():
                 self._category_cache[cat.name] = cat.id
+
+    def _load_learned_mappings(self):
+        """Load persisted merchant→category mappings from DB into in-memory cache."""
+        with Session(self.engine) as db:
+            for mapping in db.query(MerchantCategoryMapping).all():
+                self._learned[mapping.merchant_name] = mapping.category_id
 
     def categorize(self, merchant_name: str | None, description: str | None) -> int | None:
         if not merchant_name and not description:
@@ -57,7 +64,6 @@ class Categorizer:
 
         merchant_lower = (merchant_name or "").lower().strip()
         desc_lower = (description or "").lower().strip()
-        combined = f"{merchant_lower} {desc_lower}"
 
         # 1. Check learned mappings
         if merchant_lower in self._learned:
@@ -76,4 +82,14 @@ class Categorizer:
         return None
 
     def learn(self, merchant_name: str, category_id: int) -> None:
-        self._learned[merchant_name.lower().strip()] = category_id
+        """Persist a merchant→category mapping to DB and update in-memory cache."""
+        key = merchant_name.lower().strip()
+        self._learned[key] = category_id
+
+        with Session(self.engine) as db:
+            existing = db.query(MerchantCategoryMapping).filter_by(merchant_name=key).first()
+            if existing:
+                existing.category_id = category_id
+            else:
+                db.add(MerchantCategoryMapping(merchant_name=key, category_id=category_id))
+            db.commit()

@@ -30,6 +30,13 @@ def scheduled_sync():
                 sync.sync_account(account.id, connector, account.name)
 
 
+def scheduled_fetch_rates():
+    """Called by APScheduler daily to refresh exchange rates."""
+    from tms.services.currency import CurrencyService
+    currency = CurrencyService(engine)
+    currency.fetch_and_store_rates()
+
+
 def _get_connector(bank: str):
     from tms.connectors.lean import LeanConnector
     from tms.connectors.revolut import RevolutConnector
@@ -66,6 +73,10 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         scheduled_sync, "interval",
         minutes=settings.sync_interval_minutes, id="bank_sync",
+    )
+    scheduler.add_job(
+        scheduled_fetch_rates, "interval",
+        hours=24, id="exchange_rates",
     )
     scheduler.start()
 
