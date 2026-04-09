@@ -54,7 +54,7 @@ data class CategoriesUiState(
     val categorySpends: List<CategorySpend> = emptyList(),
     val transactions: List<TransactionEntity> = emptyList(),
     val categories: List<CategoryEntity> = emptyList(),
-    val selectedCategoryId: Int? = null,
+    val selectedCategoryIds: Set<Int> = emptySet(),
     val isLoading: Boolean = false,
     val error: String? = null,
     val monthlySummary: List<MonthlySummaryEntry> = emptyList(),
@@ -110,8 +110,9 @@ class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
                 }.filter { it.totalAed > 0 }
                     .sortedByDescending { it.totalAed }
 
-                val selectedTxs = if (_uiState.value.selectedCategoryId != null) {
-                    transactions.filter { it.categoryId == _uiState.value.selectedCategoryId }
+                val ids = _uiState.value.selectedCategoryIds
+                val selectedTxs = if (ids.isNotEmpty()) {
+                    transactions.filter { it.categoryId in ids }
                 } else {
                     transactions
                 }
@@ -180,8 +181,15 @@ class CategoriesViewModel(private val container: AppContainer) : ViewModel() {
         }
     }
 
-    fun selectCategory(categoryId: Int?) {
-        _uiState.value = _uiState.value.copy(selectedCategoryId = categoryId)
+    fun toggleCategory(categoryId: Int) {
+        val current = _uiState.value.selectedCategoryIds
+        val updated = if (categoryId in current) current - categoryId else current + categoryId
+        _uiState.value = _uiState.value.copy(selectedCategoryIds = updated)
+        observeData()
+    }
+
+    fun clearCategoryFilter() {
+        _uiState.value = _uiState.value.copy(selectedCategoryIds = emptySet())
         observeData()
     }
 

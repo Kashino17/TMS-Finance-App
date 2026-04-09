@@ -56,7 +56,7 @@ fun DonutChart(
     chartSize: Dp = 180.dp,
     strokeWidth: Dp = 32.dp,
     onSliceClick: ((Int) -> Unit)? = null,
-    selectedIndex: Int? = null
+    selectedIndices: Set<Int> = emptySet()
 ) {
     val total = slices.sumOf { it.value }
     if (total == 0.0 || slices.isEmpty()) return
@@ -64,7 +64,7 @@ fun DonutChart(
     var animationPlayed by remember { mutableStateOf(false) }
     val animatedProgress by animateFloatAsState(
         targetValue = if (animationPlayed) 1f else 0f,
-        animationSpec = tween(durationMillis = 900),
+        animationSpec = tween(durationMillis = 1200, easing = androidx.compose.animation.core.FastOutSlowInEasing),
         label = "donut_anim"
     )
 
@@ -118,7 +118,7 @@ fun DonutChart(
         Spacer(modifier = Modifier.height(16.dp))
 
         slices.forEachIndexed { index, slice ->
-            val isSelected = selectedIndex == index
+            val isSelected = index in selectedIndices
             Row(
                 modifier = Modifier
                     .fillMaxWidth()

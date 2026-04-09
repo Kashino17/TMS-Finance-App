@@ -1,5 +1,11 @@
 package com.tms.banking.ui.categories
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -116,9 +122,9 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
         }
     }
 
-    val filteredByCategory = remember(filteredTransactions, state.selectedCategoryId) {
-        if (state.selectedCategoryId != null) {
-            filteredTransactions.filter { it.categoryId == state.selectedCategoryId }
+    val filteredByCategory = remember(filteredTransactions, state.selectedCategoryIds) {
+        if (state.selectedCategoryIds.isNotEmpty()) {
+            filteredTransactions.filter { it.categoryId in state.selectedCategoryIds }
         } else {
             filteredTransactions
         }
@@ -184,13 +190,12 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Background)
         )
 
-        // Find selected donut index for highlighting
-        val selectedDonutIndex = remember(state.selectedCategoryId, donutSlices, state.categories) {
-            if (state.selectedCategoryId == null) null
-            else {
-                val catName = state.categories.find { it.id == state.selectedCategoryId }?.name
+        // Map selected category IDs to donut slice indices
+        val selectedDonutIndices = remember(state.selectedCategoryIds, donutSlices, state.categories) {
+            state.selectedCategoryIds.mapNotNull { catId ->
+                val catName = state.categories.find { it.id == catId }?.name
                 donutSlices.indexOfFirst { it.label == catName }.takeIf { it >= 0 }
-            }
+            }.toSet()
         }
 
         LazyColumn(
@@ -208,12 +213,18 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text("Total Spent", color = OnSurface, fontSize = 13.sp)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            formatAmount(totalSpend, "AED"),
-                            color = Negative,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 28.sp
-                        )
+                        AnimatedContent(
+                            targetState = formatAmount(totalSpend, "AED"),
+                            transitionSpec = { fadeIn(tween(300)) togetherWith fadeOut(tween(150)) },
+                            label = "total_anim"
+                        ) { amount ->
+                            Text(
+                                amount,
+                                color = Negative,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 28.sp
+                            )
+                        }
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
@@ -254,20 +265,22 @@ fun CategoriesScreen(app: TmsApp, onNavigateToSubscriptions: () -> Unit = {}) {
                             Spacer(modifier = Modifier.height(12.dp))
                             DonutChart(
                                 slices = donutSlices,
-                                totalLabel = dateFilter.label,
+                                totalLabel = if (state.selectedCategoryIds.isEmpty()) dateFilter.label else "${state.selectedCategoryIds.size} selected",
                                 totalValue = formatAmount(totalSpend, "AED"),
                                 modifier = Modifier.fillMaxWidth(),
                                 onSliceClick = { index ->
                                     val catName = donutSlices.getOrNull(index)?.label
                                     val catId = state.categories.find { it.name == catName }?.id
-                                    if (catId == state.selectedCategoryId) {
-                                        vm.selectCategory(null) // Deselect
-                                    } else {
-                                        vm.selectCategory(catId)
-                                    }
+                                    if (catId != null) vm.toggleCategory(catId)
                                 },
-                                selectedIndex = selectedDonutIndex
+                                selectedIndices = selectedDonutIndices
                             )
+                            if (state.selectedCategoryIds.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                TextButton(onClick = { vm.clearCategoryFilter() }) {
+                                    Text("Clear filter", color = Primary, fontSize = 12.sp)
+                                }
+                            }
                         }
                     }
                 }
