@@ -57,12 +57,17 @@ def _detect_recurring(db: Session) -> list[dict]:
         .all()
     )
 
+    # Case-insensitive grouping + merge duplicates
     by_merchant: dict[str, list[Transaction]] = {}
+    merchant_display: dict[str, str] = {}  # lowercase → display name
     for txn in transactions:
         merchant = txn.merchant_name.strip()
         if not merchant:
             continue
-        by_merchant.setdefault(merchant, []).append(txn)
+        key = merchant.lower()
+        by_merchant.setdefault(key, []).append(txn)
+        if key not in merchant_display:
+            merchant_display[key] = merchant
 
     all_category_ids = {
         txn.category_id for txns in by_merchant.values() for txn in txns if txn.category_id
@@ -72,11 +77,23 @@ def _detect_recurring(db: Session) -> list[dict]:
         for cat in db.query(Category).filter(Category.id.in_(all_category_ids)).all()
     } if all_category_ids else {}
 
+    # Categories that are NOT subscriptions
+    NON_SUB_CATEGORIES = {"Restaurants", "Lebensmittel", "Transport", "Auto", "Reisen", "Gesundheit", "Spenden", "Transfers", "Einkommen", "Bankgebühren"}
+
+    # Known subscription/SaaS merchants — always detected as recurring
+    KNOWN_SUBS = {
+        "netflix", "spotify", "claude.ai", "openai", "chatgpt", "crunchyroll",
+        "google one", "google workspace", "google cloud", "apple.com/bill", "apple.com",
+        "capcut", "noon one", "careem plus", "hostinger", "render", "vercel",
+        "supabase", "shopify", "omnisend", "moonshot", "mureka", "wafeq",
+        "anthropic", "talkpal", "videoinu", "ppg digital",
+    }
+
     today = date.today()
     current_month_start = today.replace(day=1)
 
     results = []
-    for merchant, txns in by_merchant.items():
+    for merchant_key, txns in by_merchant.items():
         if len(txns) < 2:
             continue
 
@@ -84,10 +101,8 @@ def _detect_recurring(db: Session) -> list[dict]:
         amounts = [t.amount_aed for t in txns_sorted]
         avg_amount = sum(amounts) / len(amounts)
 
-        # Check amounts within ±30% tolerance (more lenient for currency fluctuations)
-        tolerance = abs(avg_amount) * 0.30
-        if any(abs(a - avg_amount) > tolerance for a in amounts):
-            continue
+        # Is this a known subscription?
+        is_known_sub = any(k in merchant_key for k in KNOWN_SUBS)
 
         dates = [t.date for t in txns_sorted]
         intervals = [(dates[i + 1] - dates[i]).days for i in range(len(dates) - 1)]
@@ -97,25 +112,27 @@ def _detect_recurring(db: Session) -> list[dict]:
 
         avg_interval = sum(intervals) / len(intervals)
 
-        # Detect frequency
-        if all(20 <= gap <= 40 for gap in intervals):
-            frequency = "monthly"
-        elif all(5 <= gap <= 9 for gap in intervals):
-            frequency = "weekly"
-        elif all(350 <= gap <= 380 for gap in intervals):
-            frequency = "yearly"
+        # For known subs: just check roughly monthly (avg 20-40 days)
+        # For unknown: stricter interval check
+        if is_known_sub:
+            if 15 <= avg_interval <= 45:
+                frequency = "monthly"
+            elif 340 <= avg_interval <= 400:
+                frequency = "yearly"
+            else:
+                frequency = "monthly"  # Known subs are always monthly
         else:
-            continue
+            # Amount tolerance ±50% (currency fluctuations)
+            tolerance = abs(avg_amount) * 0.50
+            if any(abs(a - avg_amount) > tolerance for a in amounts):
+                continue
 
-        last_date = dates[-1]
-        next_estimated = last_date + timedelta(days=round(avg_interval))
+            monthly_count = sum(1 for g in intervals if 20 <= g <= 40)
 
-        # Active status: has a transaction this month?
-        has_this_month = any(d >= current_month_start for d in dates)
-
-        # If expected date is past and no charge this month → possibly cancelled
-        is_overdue = next_estimated < today and not has_this_month
-        status = "active" if has_this_month else ("overdue" if is_overdue else "pending")
+            if monthly_count >= len(intervals) * 0.5:
+                frequency = "monthly"
+            else:
+                continue
 
         # Category info
         cat_ids = [t.category_id for t in txns_sorted if t.category_id]
@@ -129,10 +146,29 @@ def _detect_recurring(db: Session) -> list[dict]:
                 if cat.name == "Business":
                     category_type = "business"
 
-        cancel_url = _get_cancel_url(merchant)
+        # Skip non-subscription categories UNLESS it's a known sub
+        if not is_known_sub and category_name in NON_SUB_CATEGORIES:
+            continue
+
+        last_date = dates[-1]
+        next_estimated = last_date + timedelta(days=round(avg_interval))
+
+        # Status: active if charged this month, pending if expected soon, inactive if old
+        has_this_month = any(d >= current_month_start for d in dates)
+        days_since_last = (today - last_date).days
+
+        if has_this_month:
+            status = "active"
+        elif days_since_last <= 45:
+            status = "pending"
+        else:
+            status = "inactive"
+
+        cancel_url = _get_cancel_url(merchant_key)
+        display_name = merchant_display.get(merchant_key, merchant_key)
 
         results.append({
-            "merchant": merchant,
+            "merchant": display_name,
             "avg_amount": round(avg_amount, 2),
             "frequency": frequency,
             "last_date": last_date.isoformat(),
