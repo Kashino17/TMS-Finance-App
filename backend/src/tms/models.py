@@ -118,3 +118,15 @@ class MerchantCategoryMapping(Base):
     merchant_name: Mapped[str] = mapped_column(String(300), unique=True)
     category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+
+class Budget(Base):
+    __tablename__ = "budgets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    category_id: Mapped[int] = mapped_column(ForeignKey("categories.id"))
+    amount_limit: Mapped[float] = mapped_column(Float)
+    period: Mapped[str] = mapped_column(String(20), default="monthly")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(UTC)
+    )

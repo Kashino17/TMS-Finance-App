@@ -12,6 +12,10 @@ from tms.api.notifications import router as notifications_router
 from tms.api.sync import router as sync_router
 from tms.api.ai_categorize import router as ai_router
 from tms.api.loans import router as loans_router
+from tms.api.analytics import router as analytics_router
+from tms.api.recurring import router as recurring_router
+from tms.api.budgets import router as budgets_router
+from tms.api.export import router as export_router
 
 scheduler = BackgroundScheduler()
 
@@ -97,6 +101,10 @@ app.include_router(notifications_router)
 app.include_router(sync_router)
 app.include_router(ai_router)
 app.include_router(loans_router)
+app.include_router(analytics_router)
+app.include_router(recurring_router)
+app.include_router(budgets_router)
+app.include_router(export_router)
 
 
 @app.get("/health")
