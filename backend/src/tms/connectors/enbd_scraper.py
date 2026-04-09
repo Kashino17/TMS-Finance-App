@@ -6,7 +6,7 @@ from playwright.sync_api import sync_playwright, Page, TimeoutError as PwTimeout
 from tms.connectors.base import RawTransaction, AccountBalance
 
 ENBD_LOGIN_URL = "https://online.emiratesnbd.com/"
-SMART_PASS_TIMEOUT_MS = 120_000  # 2 minutes to approve Smart Pass
+SMART_PASS_TIMEOUT_MS = 600_000  # 10 minutes to approve Smart Pass
 
 
 class ENBDScraper:
@@ -19,14 +19,43 @@ class ENBDScraper:
         with sync_playwright() as p:
             browser = p.chromium.launch(
                 headless=False,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+                channel="chromium",
+                args=[
+                    "--disable-blink-features=AutomationControlled",
+                    "--no-sandbox",
+                    "--disable-web-security",
+                ],
             )
             context = browser.new_context(
                 user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
                 viewport={"width": 1280, "height": 800},
             )
+            context.set_default_timeout(3600_000)  # 1 hour global timeout
+            context.set_default_navigation_timeout(120_000)  # 2 min for page loads
             context.add_init_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             page = context.new_page()
+
+            # Intercept ALL network requests to find ENBD's internal API
+            api_calls = []
+            def capture_response(resp):
+                try:
+                    url = resp.url
+                    # Capture anything that looks like an API call (not static assets)
+                    if not any(ext in url for ext in ['.js', '.css', '.png', '.jpg', '.svg', '.woff', '.ico']):
+                        body = ""
+                        try:
+                            body = resp.text()[:500] if resp.status == 200 else ""
+                        except:
+                            pass
+                        api_calls.append({
+                            "url": url,
+                            "status": resp.status,
+                            "method": resp.request.method,
+                            "body_preview": body[:300],
+                        })
+                except:
+                    pass
+            page.on("response", capture_response)
 
             try:
                 self._login(page)
@@ -46,17 +75,40 @@ class ENBDScraper:
                 accounts = self._parse_accounts(text)
                 transactions = self._parse_transactions(text, page, full_sync=full_sync)
 
+                # Save intercepted API calls for analysis
+                with open("/tmp/enbd_api_calls.txt", "w") as f:
+                    for call in api_calls:
+                        f.write(f"{call['method']} {call['status']} {call['url']}\n")
+                        if call.get('body_preview'):
+                            f.write(f"  BODY: {call['body_preview']}\n")
+
                 return accounts, transactions
             finally:
                 browser.close()
 
     def _login(self, page: Page):
         page.goto(ENBD_LOGIN_URL, wait_until="domcontentloaded", timeout=60_000)
-        page.wait_for_timeout(3000)
-        page.wait_for_selector(
-            'input[type="text"], input[type="email"], input[name*="user"], input[placeholder*="Email"], input[placeholder*="Username"]',
-            timeout=30_000,
-        )
+        page.wait_for_timeout(5000)
+        page.screenshot(path="/tmp/enbd_login_page.png")
+        with open("/tmp/enbd_login_page_text.txt", "w") as f:
+            f.write(page.inner_text("body"))
+        try:
+            page.wait_for_selector(
+                'input[type="text"], input[type="email"], input[name*="user"], input[placeholder*="Email"], input[placeholder*="Username"]',
+                timeout=30_000,
+            )
+        except Exception:
+            # Retry: maybe there's a cookie banner or popup to dismiss first
+            page.screenshot(path="/tmp/enbd_login_failed.png")
+            # Try clicking any dismiss/accept buttons
+            for sel in ['button:has-text("Accept")', 'button:has-text("OK")', 'button:has-text("Close")', '[class*="close"]', '[class*="dismiss"]']:
+                try:
+                    page.locator(sel).first.click(timeout=2000)
+                    page.wait_for_timeout(1000)
+                except:
+                    pass
+            # Try again with broader selector
+            page.wait_for_selector('input', timeout=15_000)
         username_input = page.locator('input[type="text"], input[type="email"]').first
         username_input.fill(self.username)
         password_input = page.locator('input[type="password"]').first
@@ -261,7 +313,7 @@ class ENBDScraper:
         container, not the window. We simulate real mouse wheel scrolling in the center
         of the page, exactly like a user would do manually.
         """
-        max_scrolls = 3000
+        max_scrolls = 10000  # Enough for years of transactions
         prev_line_count = 0
         stall_count = 0
 
